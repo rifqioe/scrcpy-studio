@@ -47,8 +47,20 @@ fn keycode(action: &str) -> Option<&'static str> {
         "copy" => "278",      // KEYCODE_COPY
         "paste" => "279",     // KEYCODE_PASTE
         "cut" => "277",       // KEYCODE_CUT
+        "assist" => "219",    // KEYCODE_ASSIST (hold-home → assistant/Gemini)
         _ => return None,
     })
+}
+
+/// Cycle the device's forced display rotation (0→1→2→3), disabling auto-rotate first.
+fn rotate(adb: &Path, serial: &str) -> Result<()> {
+    let out = adb_args(adb, serial, &["shell", "settings", "get", "system", "user_rotation"])
+        .output()
+        .map_err(|e| AppError::Adb(format!("read rotation: {e}")))?;
+    let cur: i32 = String::from_utf8_lossy(&out.stdout).trim().parse().unwrap_or(0);
+    let next = ((cur + 1) % 4).to_string();
+    run(adb, serial, &["shell", "settings", "put", "system", "accelerometer_rotation", "0"])?;
+    run(adb, serial, &["shell", "settings", "put", "system", "user_rotation", &next])
 }
 
 /// Perform a device action. Keycode-backed actions plus a few system commands.
@@ -66,6 +78,7 @@ pub fn action(adb: &Path, serial: &str, action: &str) -> Result<()> {
         "notifications" => run(adb, serial, &["shell", "cmd", "statusbar", "expand-notifications"]),
         "collapse" => run(adb, serial, &["shell", "cmd", "statusbar", "collapse"]),
         "settings" => run(adb, serial, &["shell", "cmd", "statusbar", "expand-settings"]),
+        "rotate" => rotate(adb, serial),
         other => Err(AppError::InvalidArgs(format!("unknown control action: {other}"))),
     }
 }

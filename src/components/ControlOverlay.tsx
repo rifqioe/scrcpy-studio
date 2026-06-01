@@ -1,6 +1,6 @@
-// Content of the standalone always-on-top control window — a slim vertical bar that can sit
-// on top of the scrcpy mirror. Runs in its own webview, so it reads the initial target serial
-// from the window URL and can switch among connected devices itself.
+// Content of the standalone always-on-top control window — a slim vertical bar that sits on
+// top of the scrcpy mirror. Its own webview, so it reads the initial target serial from the
+// window URL and can switch among connected devices itself.
 import { useEffect, useRef, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
@@ -10,9 +10,10 @@ import {
   Circle,
   Clipboard,
   Copy,
-  GripVertical,
+  GripHorizontal,
   Menu as MenuIcon,
   Power,
+  RotateCw,
   Smartphone,
   Square,
   Volume1,
@@ -28,7 +29,9 @@ interface Btn {
   action: string;
   label: string;
   Icon: LucideIcon;
-  holdable?: boolean;
+  /** "repeat": fire rapidly while held (volume). "long": 500ms hold sends `holdAction`. */
+  mode?: "repeat" | "long";
+  holdAction?: string;
 }
 
 // Only actions adb can perform on the device directly (independent of the scrcpy window).
@@ -36,14 +39,15 @@ const BUTTONS: Btn[] = [
   { action: "notifications", label: "Notifications", Icon: Bell },
   { action: "copy", label: "Copy", Icon: Copy },
   { action: "paste", label: "Paste", Icon: Clipboard },
-  { action: "volume_up", label: "Volume +", Icon: Volume2 },
-  { action: "volume_down", label: "Volume −", Icon: Volume1 },
+  { action: "volume_up", label: "Volume + (hold = rapid)", Icon: Volume2, mode: "repeat" },
+  { action: "volume_down", label: "Volume − (hold = rapid)", Icon: Volume1, mode: "repeat" },
   { action: "mute", label: "Mute", Icon: VolumeX },
-  { action: "power", label: "Power (hold = menu)", Icon: Power, holdable: true },
-  { action: "home", label: "Home", Icon: Circle },
+  { action: "power", label: "Power (hold = power menu)", Icon: Power, mode: "long", holdAction: "hold_power" },
+  { action: "home", label: "Home (hold = assistant)", Icon: Circle, mode: "long", holdAction: "assist" },
   { action: "back", label: "Back", Icon: ChevronLeft },
   { action: "recents", label: "Recents", Icon: Square },
   { action: "menu", label: "Menu", Icon: MenuIcon },
+  { action: "rotate", label: "Rotate screen", Icon: RotateCw },
 ];
 
 export function ControlOverlay() {
@@ -52,7 +56,10 @@ export function ControlOverlay() {
   const [target, setTarget] = useState(initial);
   const [status, setStatus] = useState<string>();
   const holdTimer = useRef<number | null>(null);
+  const repeatTimer = useRef<number | null>(null);
   const heldRef = useRef(false);
+  const targetRef = useRef(initial);
+  targetRef.current = target;
 
   useEffect(() => {
     listDevices()
@@ -64,45 +71,64 @@ export function ControlOverlay() {
   }, [initial]);
 
   async function send(action: string) {
-    if (!target) {
+    const serial = targetRef.current;
+    if (!serial) {
       setStatus("no device");
       return;
     }
-    setStatus(undefined);
     try {
-      await deviceAction(target, action);
+      await deviceAction(serial, action);
     } catch (e) {
       setStatus(errMessage(e));
     }
   }
 
   async function shot() {
-    if (!target) return;
+    if (!targetRef.current) return;
     setStatus("…");
     try {
-      const path = await deviceScreenshot(target, Date.now());
+      const path = await deviceScreenshot(targetRef.current, Date.now());
       setStatus(path.split(/[\\/]/).pop());
     } catch (e) {
       setStatus(errMessage(e));
     }
   }
 
-  // Press = tap action; hold (500ms) = long-press variant.
-  function holdHandlers(b: Btn) {
-    if (!b.holdable) return { onClick: () => send(b.action) };
-    return {
-      onPointerDown: () => {
-        heldRef.current = false;
-        holdTimer.current = window.setTimeout(() => {
-          heldRef.current = true;
-          send(`hold_${b.action}`);
-        }, 500);
-      },
-      onPointerUp: () => {
-        if (holdTimer.current) window.clearTimeout(holdTimer.current);
-        if (!heldRef.current) send(b.action);
-      },
-    };
+  function clearTimers() {
+    if (holdTimer.current) window.clearTimeout(holdTimer.current);
+    if (repeatTimer.current) window.clearInterval(repeatTimer.current);
+    holdTimer.current = null;
+    repeatTimer.current = null;
+  }
+
+  function handlers(b: Btn) {
+    if (b.mode === "repeat") {
+      return {
+        onPointerDown: () => {
+          send(b.action);
+          repeatTimer.current = window.setInterval(() => send(b.action), 130);
+        },
+        onPointerUp: clearTimers,
+        onPointerLeave: clearTimers,
+      };
+    }
+    if (b.mode === "long") {
+      return {
+        onPointerDown: () => {
+          heldRef.current = false;
+          holdTimer.current = window.setTimeout(() => {
+            heldRef.current = true;
+            send(b.holdAction!);
+          }, 500);
+        },
+        onPointerUp: () => {
+          clearTimers();
+          if (!heldRef.current) send(b.action);
+        },
+        onPointerLeave: clearTimers,
+      };
+    }
+    return { onClick: () => send(b.action) };
   }
 
   function cycleDevice() {
@@ -113,47 +139,41 @@ export function ControlOverlay() {
 
   const targetDev = devices.find((d) => d.serial === target);
   const targetName = (targetDev?.model ?? target) || "none";
-  const iconBtn =
-    "flex h-9 w-9 items-center justify-center rounded-lg text-zinc-200 hover:bg-zinc-700";
+  const btn =
+    "flex h-9 w-full items-center justify-center text-zinc-300 hover:bg-zinc-700/70 hover:text-zinc-100";
 
   return (
-    <div className="flex h-screen w-screen flex-col items-center bg-zinc-900 py-1 text-zinc-100">
-      <button onClick={() => getCurrentWindow().close()} className={iconBtn} title="Close">
-        <X size={18} />
+    // The whole bar is a drag region; buttons still receive clicks, empty gaps drag the window.
+    <div
+      data-tauri-drag-region
+      className="flex h-screen w-screen flex-col items-center bg-zinc-900 text-zinc-100"
+    >
+      <button onClick={() => getCurrentWindow().close()} className={btn} title="Close">
+        <X size={17} />
       </button>
-
-      <button
-        onClick={cycleDevice}
-        className={iconBtn}
-        title={`Target: ${targetName} (${target || "?"})${devices.length > 1 ? " — click to switch" : ""}`}
-      >
-        <Smartphone size={18} />
+      <button onClick={cycleDevice} className={btn} title={`Target: ${targetName} (${target || "?"})${devices.length > 1 ? " — click to switch" : ""}`}>
+        <Smartphone size={17} />
       </button>
-
-      <div className="my-1 h-px w-7 bg-zinc-700" />
+      <div className="my-1 h-px w-6 bg-zinc-700" />
 
       {BUTTONS.map((b) => (
-        <button key={b.action} className={iconBtn} title={b.label} {...holdHandlers(b)}>
-          <b.Icon size={18} />
+        <button key={b.action} className={btn} title={b.label} {...handlers(b)}>
+          <b.Icon size={17} />
         </button>
       ))}
 
-      <button onClick={shot} className={iconBtn} title="Screenshot">
-        <Camera size={18} />
+      <button onClick={shot} className={btn} title="Screenshot">
+        <Camera size={17} />
       </button>
 
-      <div className="mt-auto flex flex-col items-center">
+      <div className="mt-auto flex w-full flex-col items-center">
         {status && (
-          <span className="mb-1 max-w-[3rem] truncate text-[8px] text-zinc-500" title={status}>
+          <span className="max-w-full truncate px-1 text-[8px] text-zinc-500" title={status}>
             {status}
           </span>
         )}
-        <div
-          data-tauri-drag-region
-          title="Drag"
-          className="flex h-7 w-9 cursor-move items-center justify-center rounded-lg bg-zinc-800 text-zinc-500"
-        >
-          <GripVertical size={16} />
+        <div data-tauri-drag-region title="Drag" className="flex h-6 w-full cursor-move items-center justify-center text-zinc-600">
+          <GripHorizontal size={15} />
         </div>
       </div>
     </div>
