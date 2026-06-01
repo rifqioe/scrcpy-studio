@@ -81,9 +81,9 @@ export function BinaryManager() {
             {busy ? "Installing…" : "Install latest"}
           </Button>
         )}
-        {current && (
-          <Button variant={updateAvailable ? "primary" : "default"} disabled={busy} onClick={update}>
-            {busy ? "Working…" : updateAvailable ? `Update → ${latest}` : "Reinstall latest"}
+        {current && updateAvailable && (
+          <Button variant="primary" disabled={busy} onClick={update}>
+            {busy ? "Working…" : `Update → ${latest}`}
           </Button>
         )}
       </div>
