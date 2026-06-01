@@ -4,6 +4,7 @@ import { useDevices } from "../state/devices";
 import { useSessions } from "../state/sessions";
 import { buildPreview } from "../lib/preview";
 import { launch, errMessage } from "../lib/ipc";
+import { openControlWindow } from "../lib/controlWindow";
 import { Button } from "./ui";
 
 export function CommandBar({ hasBinary }: { hasBinary: boolean }) {
@@ -47,6 +48,14 @@ export function CommandBar({ hasBinary }: { hasBinary: boolean }) {
         </code>
         <Button variant="ghost" onClick={copy}>
           {copied ? "Copied" : "Copy"}
+        </Button>
+        <Button
+          variant="ghost"
+          disabled={!selected}
+          title={selected ? "Open floating device controls" : "Select a device first"}
+          onClick={() => openControlWindow(selected!).catch((e) => setError(errMessage(e)))}
+        >
+          Controls
         </Button>
         <Button
           variant="primary"

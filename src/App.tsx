@@ -5,7 +5,6 @@ import { ProfileBar } from "./components/ProfileBar";
 import { CommandBar } from "./components/CommandBar";
 import { ShortcutsPanel } from "./components/ShortcutsPanel";
 import { AppsPanel } from "./components/AppsPanel";
-import { ControlToolbar } from "./components/ControlToolbar";
 import {
   AudioPanel,
   CameraPanel,
@@ -79,7 +78,6 @@ export default function App() {
       </main>
 
       <SessionList />
-      <ControlToolbar />
     </div>
   );
 }
