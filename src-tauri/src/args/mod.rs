@@ -165,7 +165,6 @@ pub struct General {
     pub kill_adb_on_close: bool,       // --kill-adb-on-close
     pub no_cleanup: bool,              // --no-cleanup
     pub no_mipmaps: bool,              // --no-mipmaps
-    pub time_limit: Option<u32>,       // --time-limit
     pub verbosity: Option<String>,     // -V / --verbosity
     pub pause_on_exit: Option<String>, // --pause-on-exit
     pub push_target: Option<String>,   // --push-target

@@ -82,6 +82,51 @@ impl WindowsProvider {
             .ok_or_else(|| AppError::Download("could not parse tag from redirect".into()))
     }
 
+    /// Resolve `(download_url, expected_sha256_hex)` for the win64 zip of `version`.
+    ///
+    /// Prefers the GitHub API (which exposes both the asset URL and its `digest`). Falls back
+    /// to the conventional download URL with no digest when the API is unavailable.
+    fn resolve_asset(&self, version: &str, asset_name: &str) -> (String, Option<String>) {
+        let fallback = format!(
+            "https://github.com/{REPO}/releases/download/{version}/{asset_name}"
+        );
+        let from_api = || -> Result<(String, Option<String>)> {
+            let url = format!("https://api.github.com/repos/{REPO}/releases/tags/{version}");
+            let resp = Self::client()?
+                .get(url)
+                .send()
+                .map_err(|e| AppError::Download(e.to_string()))?;
+            if !resp.status().is_success() {
+                return Err(AppError::Download(format!("API returned {}", resp.status())));
+            }
+            let json: serde_json::Value =
+                resp.json().map_err(|e| AppError::Download(e.to_string()))?;
+            let assets = json
+                .get("assets")
+                .and_then(|a| a.as_array())
+                .ok_or_else(|| AppError::Download("no assets in release".into()))?;
+            for a in assets {
+                let name = a.get("name").and_then(|n| n.as_str()).unwrap_or("");
+                if name.contains("win64") && name.ends_with(".zip") {
+                    let dl = a
+                        .get("browser_download_url")
+                        .and_then(|u| u.as_str())
+                        .map(|s| s.to_string())
+                        .unwrap_or_else(|| fallback.clone());
+                    // `digest` looks like "sha256:<hex>".
+                    let digest = a
+                        .get("digest")
+                        .and_then(|d| d.as_str())
+                        .and_then(|d| d.strip_prefix("sha256:"))
+                        .map(|h| h.to_lowercase());
+                    return Ok((dl, digest));
+                }
+            }
+            Err(AppError::Download("no win64 asset in release".into()))
+        };
+        from_api().unwrap_or((fallback, None))
+    }
+
     fn download_bytes(url: &str) -> Result<Vec<u8>> {
         let resp = Self::client()?
             .get(url)
@@ -152,26 +197,21 @@ impl BinaryProvider for WindowsProvider {
 
     fn install(&self, version: &str, dest: &Path) -> Result<Binaries> {
         let asset = format!("scrcpy-win64-{version}.zip");
-        let base = format!("https://github.com/{REPO}/releases/download/{version}");
-        let zip_url = format!("{base}/{asset}");
-        let sha_url = format!("{base}/{asset}.sha256");
+        // Resolve the download URL and (when the API is reachable) the published SHA-256
+        // digest. scrcpy does not publish `.sha256` sidecar files; the digest comes from the
+        // GitHub release-asset `digest` field.
+        let (zip_url, expected) = self.resolve_asset(version, &asset);
 
         let zip_bytes = Self::download_bytes(&zip_url)?;
 
-        // Verify checksum when the sidecar is available (refuse on mismatch).
-        if let Ok(sha_bytes) = Self::download_bytes(&sha_url) {
-            let expected = String::from_utf8_lossy(&sha_bytes)
-                .split_whitespace()
-                .next()
-                .unwrap_or("")
-                .to_lowercase();
-            if !expected.is_empty() {
-                let actual = Self::sha256_hex(&zip_bytes);
-                if actual != expected {
-                    return Err(AppError::Download(format!(
-                        "checksum mismatch for {asset}: expected {expected}, got {actual}"
-                    )));
-                }
+        // Verify only when the API gave us a digest. If it didn't (e.g. rate-limited), we do
+        // NOT silently claim success — extraction proceeds unverified by necessity.
+        if let Some(expected) = expected {
+            let actual = Self::sha256_hex(&zip_bytes);
+            if actual != expected {
+                return Err(AppError::Download(format!(
+                    "checksum mismatch for {asset}: expected {expected}, got {actual}"
+                )));
             }
         }
 
@@ -227,6 +267,20 @@ mod tests {
             h,
             "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
         );
+    }
+
+    /// Real end-to-end install: resolve asset → download → (verify) → extract → locate.
+    /// Network + ~30 MB download, so it's `#[ignore]`. Run with:
+    ///   cargo test -- --ignored install_v40_end_to_end
+    #[test]
+    #[ignore]
+    fn install_v40_end_to_end() {
+        let tmp = tempfile::tempdir().unwrap();
+        let provider = WindowsProvider::new();
+        let bin = provider.install("v4.0", tmp.path()).expect("install failed");
+        assert!(bin.scrcpy.exists(), "scrcpy.exe not located");
+        assert!(bin.adb.exists(), "adb.exe not located");
+        assert_eq!(bin.version, "v4.0");
     }
 
     #[test]

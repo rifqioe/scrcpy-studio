@@ -171,7 +171,6 @@ impl ScrcpyArgs {
         a.flag(g.kill_adb_on_close, "--kill-adb-on-close");
         a.flag(g.no_cleanup, "--no-cleanup");
         a.flag(g.no_mipmaps, "--no-mipmaps");
-        a.opt("--time-limit", &g.time_limit);
         a.opt("--verbosity", &g.verbosity);
         a.opt("--pause-on-exit", &g.pause_on_exit);
         a.opt("--push-target", &g.push_target);

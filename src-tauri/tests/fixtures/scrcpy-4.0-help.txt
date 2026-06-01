@@ -81,7 +81,7 @@ Options (flag => model field):
     --start-app=name                 virtual_display.start_app
     -t, --show-touches               control.show_touches
     --tcpip[=[+]ip[:port]]           connect.tcpip
-    --time-limit=seconds             record.time_limit / general.time_limit
+    --time-limit=seconds             record.time_limit
     --tunnel-host=ip                 connect.tunnel_host
     --tunnel-port=port               connect.tunnel_port
     -V, --verbosity=value            general.verbosity (verbose|debug|info|warn|error)

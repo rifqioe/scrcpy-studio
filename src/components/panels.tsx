@@ -1,6 +1,7 @@
 // Feature panels. Each binds 1:1 to a section of the config store.
 import { useConfig } from "../state/config";
 import { Grid, NumberField, PanelTitle, SelectField, TextField, Toggle } from "./ui";
+import { Detect } from "./Detect";
 
 const opt = (...vals: string[]) => vals.map((v) => ({ value: v, label: v }));
 
@@ -47,6 +48,9 @@ export function VideoPanel() {
         <SelectField label="Display orientation" value={v.displayOrientation} options={opt("0", "90", "180", "270", "flip0", "flip90", "flip180", "flip270")} onChange={(x) => patch("video", { displayOrientation: x })} />
         <SelectField label="Orientation (both)" value={v.orientation} options={opt("0", "90", "180", "270")} onChange={(x) => patch("video", { orientation: x })} />
         <NumberField label="Display id" value={v.displayId} onChange={(x) => patch("video", { displayId: x })} />
+        <div className="flex items-end">
+          <Detect kind="displays" label="Detect displays" pattern={/--display-id=(\S+)/g} onPick={(x) => patch("video", { displayId: Number(x) })} />
+        </div>
         <NumberField label="Video buffer (ms)" value={v.videoBuffer} onChange={(x) => patch("video", { videoBuffer: x })} />
         <SelectField label="Render fit" value={v.renderFit} options={opt("letterbox", "stretched", "unscaled")} onChange={(x) => patch("video", { renderFit: x })} />
       </Grid>
@@ -90,6 +94,9 @@ export function CameraPanel() {
       <PanelTitle title="Camera source" desc={isCamera ? "Camera mirroring options." : "Set Video → Source = camera to use these."} />
       <Grid>
         <TextField label="Camera id" value={c.id} onChange={(x) => patch("camera", { id: x })} />
+        <div className="flex items-end">
+          <Detect kind="cameras" label="Detect cameras" pattern={/--camera-id=(\S+)/g} onPick={(x) => patch("camera", { id: x })} />
+        </div>
         <SelectField label="Facing" value={c.facing} options={opt("front", "back", "external")} onChange={(x) => patch("camera", { facing: x })} />
         <TextField label="Size" value={c.size} onChange={(x) => patch("camera", { size: x })} placeholder="1920x1080" />
         <TextField label="Aspect ratio" value={c.ar} onChange={(x) => patch("camera", { ar: x })} placeholder="sensor | 4:3 | 1.6" />
@@ -226,7 +233,6 @@ export function GeneralPanel() {
       <Grid>
         <SelectField label="Verbosity (-V)" value={g.verbosity} options={opt("verbose", "debug", "info", "warn", "error")} onChange={(x) => patch("general", { verbosity: x })} />
         <SelectField label="Pause on exit" value={g.pauseOnExit} options={opt("true", "false", "if-error")} onChange={(x) => patch("general", { pauseOnExit: x })} />
-        <NumberField label="Time limit (s)" value={g.timeLimit} onChange={(x) => patch("general", { timeLimit: x })} />
         <TextField label="Push target dir" value={g.pushTarget} onChange={(x) => patch("general", { pushTarget: x })} placeholder="/sdcard/Download/" />
       </Grid>
       <div className="mt-3">

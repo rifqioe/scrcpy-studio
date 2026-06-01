@@ -116,7 +116,6 @@ export interface General {
   killAdbOnClose?: boolean;
   noCleanup?: boolean;
   noMipmaps?: boolean;
-  timeLimit?: number;
   verbosity?: string;
   pauseOnExit?: string;
   pushTarget?: string;

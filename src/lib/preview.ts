@@ -152,7 +152,6 @@ export function buildArgv(a: ScrcpyArgs): string[] {
   v.flag(g.killAdbOnClose, "--kill-adb-on-close");
   v.flag(g.noCleanup, "--no-cleanup");
   v.flag(g.noMipmaps, "--no-mipmaps");
-  v.opt("--time-limit", g.timeLimit);
   v.opt("--verbosity", g.verbosity);
   v.opt("--pause-on-exit", g.pauseOnExit);
   v.opt("--push-target", g.pushTarget);
