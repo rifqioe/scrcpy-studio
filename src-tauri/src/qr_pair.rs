@@ -67,11 +67,21 @@ pub fn start(app: AppHandle, adb_path: PathBuf, session: QrSession) -> Result<()
         .map_err(|e| AppError::Adb(format!("mDNS browse: {e}")))?;
 
     std::thread::spawn(move || {
+        // adb pair needs the local server running; "protocol fault" often follows a cold server.
+        let _ = adb::start_server(&adb_path);
+
         let deadline = Instant::now() + BROWSE_TIMEOUT;
+        let mut tried: std::collections::HashSet<String> = std::collections::HashSet::new();
+        let mut last_err: Option<String> = None;
+
         loop {
             let remaining = deadline.saturating_duration_since(Instant::now());
             if remaining.is_zero() {
-                emit(&app, false, "Timed out waiting for the device to scan the QR code.");
+                let msg = match last_err {
+                    Some(e) => format!("Timed out. Last pairing error: {e}"),
+                    None => "Timed out waiting for the device to scan the QR code.".to_string(),
+                };
+                emit(&app, false, &msg);
                 break;
             }
             match receiver.recv_timeout(remaining.min(Duration::from_secs(5))) {
@@ -81,23 +91,35 @@ pub fn start(app: AppHandle, adb_path: PathBuf, session: QrSession) -> Result<()
                         continue;
                     }
                     let port = info.get_port();
-                    let Some(addr) = info.get_addresses().iter().next().copied() else {
+                    // Prefer an IPv4 address; an IPv6 link-local (fe80::) makes `adb pair`
+                    // fail with "protocol fault: couldn't read status message".
+                    let addrs = info.get_addresses();
+                    let addr = addrs
+                        .iter()
+                        .find(|a| a.is_ipv4())
+                        .or_else(|| addrs.iter().next())
+                        .copied();
+                    let Some(addr) = addr else {
                         continue;
                     };
                     let target = format!("{addr}:{port}");
-                    match adb::pair(&adb_path, &target, &session.code) {
-                        Ok(out) => emit(&app, true, &format!("Paired with {target}. {out}")),
-                        Err(e) => emit(&app, false, &format!("Pairing failed: {e}")),
+                    // Don't hammer the same endpoint repeatedly within one session.
+                    if !tried.insert(target.clone()) {
+                        continue;
                     }
-                    break;
+                    match adb::pair(&adb_path, &target, &session.code) {
+                        Ok(out) => {
+                            emit(&app, true, &format!("Paired with {target}. {out}"));
+                            break;
+                        }
+                        // Keep listening — the phone re-advertises and may succeed on a retry
+                        // or a different address.
+                        Err(e) => last_err = Some(e.to_string()),
+                    }
                 }
                 Ok(_) => {}
-                Err(_) => {
-                    if Instant::now() >= deadline {
-                        emit(&app, false, "Timed out waiting for the device.");
-                        break;
-                    }
-                }
+                Err(flume::RecvTimeoutError::Disconnected) => break,
+                Err(flume::RecvTimeoutError::Timeout) => {}
             }
         }
         let _ = daemon.shutdown();

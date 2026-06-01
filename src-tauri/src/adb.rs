@@ -92,6 +92,11 @@ pub fn parse_devices(stdout: &str) -> Vec<Device> {
     devices
 }
 
+/// `adb start-server` — ensure the local adb server is running before pairing.
+pub fn start_server(adb: &Path) -> Result<String> {
+    Ok(run(adb, &["start-server"])?.trim().to_string())
+}
+
 pub fn devices(adb: &Path) -> Result<Vec<Device>> {
     let out = run(adb, &["devices", "-l"])?;
     Ok(parse_devices(&out))
