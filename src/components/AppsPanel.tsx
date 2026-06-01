@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
+import { open } from "@tauri-apps/plugin-dialog";
 import { useConfig } from "../state/config";
 import { useDevices } from "../state/devices";
-import { listApps, errMessage, type DeviceApp } from "../lib/ipc";
+import { listApps, pullApk, errMessage, type DeviceApp } from "../lib/ipc";
 import { Button, PanelTitle, Toggle } from "./ui";
 
 export function AppsPanel() {
@@ -12,6 +13,25 @@ export function AppsPanel() {
   const [includeSystem, setIncludeSystem] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
+  const [icons, setIcons] = useState<Record<string, string>>({});
+  const [pulling, setPulling] = useState<string>();
+
+  async function pull(pkg: string) {
+    if (!selected) return;
+    const dir = await open({ directory: true, title: "Save APK to…" });
+    if (typeof dir !== "string") return;
+    setPulling(pkg);
+    setError(undefined);
+    try {
+      const res = await pullApk(selected, pkg, dir);
+      if (res.icon) setIcons((m) => ({ ...m, [pkg]: res.icon! }));
+      setError(`Saved ${res.files.length} file(s) to ${dir}`);
+    } catch (e) {
+      setError(errMessage(e));
+    } finally {
+      setPulling(undefined);
+    }
+  }
 
   async function load() {
     setBusy(true);
@@ -87,22 +107,35 @@ export function AppsPanel() {
 
       <div className="flex max-h-[50vh] flex-col gap-1 overflow-y-auto">
         {filtered.map((a) => (
-          <button
+          <div
             key={a.package}
-            onClick={() => patch("virtualDisplay", { startApp: a.package })}
             className={
-              "flex items-center justify-between rounded-md border px-2.5 py-1.5 text-left transition-colors " +
+              "flex items-center gap-2 rounded-md border px-2.5 py-1.5 transition-colors " +
               (picked === a.package
                 ? "border-emerald-500 bg-emerald-500/10"
                 : "border-zinc-800 hover:border-zinc-700")
             }
           >
-            <span className="min-w-0">
+            {icons[a.package] ? (
+              <img src={icons[a.package]} alt="" className="h-8 w-8 shrink-0 rounded" />
+            ) : (
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-zinc-800 text-xs text-zinc-500">
+                {a.name.charAt(0).toUpperCase()}
+              </span>
+            )}
+            <button
+              onClick={() => patch("virtualDisplay", { startApp: a.package })}
+              className="min-w-0 flex-1 text-left"
+              title="Set as launch target (--start-app)"
+            >
               <span className="block truncate text-sm text-zinc-100">{a.name}</span>
               <span className="block truncate font-mono text-[11px] text-zinc-500">{a.package}</span>
-            </span>
-            {a.system && <span className="ml-2 shrink-0 text-[10px] text-zinc-600">system</span>}
-          </button>
+            </button>
+            {a.system && <span className="shrink-0 text-[10px] text-zinc-600">system</span>}
+            <Button onClick={() => pull(a.package)} disabled={pulling === a.package || !selected}>
+              {pulling === a.package ? "…" : "Pull APK"}
+            </Button>
+          </div>
         ))}
       </div>
     </div>

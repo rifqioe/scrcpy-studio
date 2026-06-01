@@ -52,6 +52,13 @@ export interface DeviceApp {
 export const listApps = (serial: string | undefined, includeSystem: boolean) =>
   invoke<DeviceApp[]>("list_apps", { serial, includeSystem });
 
+export interface PullResult {
+  files: string[];
+  icon?: string | null;
+}
+export const pullApk = (serial: string, pkg: string, dest: string) =>
+  invoke<PullResult>("pull_apk", { serial, package: pkg, dest });
+
 // ---- device control ----
 export const deviceAction = (serial: string, action: string) =>
   invoke<void>("device_action", { serial, action });

@@ -170,6 +170,17 @@ pub fn list_apps(
     apps::list(&bin.scrcpy, &bin.adb, serial.as_deref(), include_system)
 }
 
+#[tauri::command]
+pub fn pull_apk(
+    state: State<AppState>,
+    serial: String,
+    package: String,
+    dest: String,
+) -> Result<crate::apk::PullResult> {
+    let bin = state.binary.require()?;
+    crate::apk::pull(&bin.adb, &serial, &package, std::path::Path::new(&dest))
+}
+
 // ---- device control (floating toolbar) ----
 
 #[tauri::command]

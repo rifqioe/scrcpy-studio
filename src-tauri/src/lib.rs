@@ -1,4 +1,5 @@
 mod adb;
+mod apk;
 mod apps;
 mod args;
 mod binary;
@@ -41,6 +42,7 @@ pub fn run() {
             commands::go_wireless,
             commands::qr_pair_start,
             commands::list_apps,
+            commands::pull_apk,
             commands::device_action,
             commands::device_screenshot,
             commands::preview_argv,
