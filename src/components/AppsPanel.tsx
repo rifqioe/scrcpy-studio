@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { MoreVertical } from "lucide-react";
 import { useConfig } from "../state/config";
 import { useDevices } from "../state/devices";
 import { listApps, createShortcut, errMessage, type DeviceApp } from "../lib/ipc";
@@ -13,6 +14,7 @@ export function AppsPanel() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
   const [working, setWorking] = useState<string>();
+  const [menuFor, setMenuFor] = useState<string>();
 
   async function load() {
     setBusy(true);
@@ -120,9 +122,29 @@ export function AppsPanel() {
               <span className="block truncate font-mono text-[11px] text-zinc-500">{a.package}</span>
             </button>
             {a.system && <span className="shrink-0 text-[10px] text-zinc-600">system</span>}
-            <Button onClick={() => makeShortcut(a)} disabled={working === a.package} title="Create a desktop shortcut that launches this app with the current config">
-              {working === a.package ? "…" : "Shortcut"}
-            </Button>
+            <div className="relative shrink-0">
+              <button
+                onClick={() => setMenuFor(menuFor === a.package ? undefined : a.package)}
+                className="flex h-7 w-7 items-center justify-center rounded-md text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
+                title="More"
+                disabled={working === a.package}
+              >
+                {working === a.package ? "…" : <MoreVertical size={16} />}
+              </button>
+              {menuFor === a.package && (
+                <>
+                  <div className="fixed inset-0 z-30" onClick={() => setMenuFor(undefined)} />
+                  <div className="absolute right-0 top-full z-40 mt-1 min-w-[12rem] rounded-md border border-zinc-700 bg-zinc-900 py-1 shadow-xl">
+                    <button
+                      onClick={() => { setMenuFor(undefined); makeShortcut(a); }}
+                      className="block w-full px-3 py-1.5 text-left text-sm text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100"
+                    >
+                      Create Desktop Shortcut
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         ))}
       </div>
