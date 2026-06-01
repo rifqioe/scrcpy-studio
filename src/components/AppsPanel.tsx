@@ -1,8 +1,7 @@
 import { useMemo, useState } from "react";
-import { open } from "@tauri-apps/plugin-dialog";
 import { useConfig } from "../state/config";
 import { useDevices } from "../state/devices";
-import { listApps, pullApk, errMessage, type DeviceApp } from "../lib/ipc";
+import { listApps, createShortcut, errMessage, type DeviceApp } from "../lib/ipc";
 import { Button, PanelTitle, Toggle } from "./ui";
 
 export function AppsPanel() {
@@ -13,25 +12,7 @@ export function AppsPanel() {
   const [includeSystem, setIncludeSystem] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
-  const [icons, setIcons] = useState<Record<string, string>>({});
-  const [pulling, setPulling] = useState<string>();
-
-  async function pull(pkg: string) {
-    if (!selected) return;
-    const dir = await open({ directory: true, title: "Save APK to…" });
-    if (typeof dir !== "string") return;
-    setPulling(pkg);
-    setError(undefined);
-    try {
-      const res = await pullApk(selected, pkg, dir);
-      if (res.icon) setIcons((m) => ({ ...m, [pkg]: res.icon! }));
-      setError(`Saved ${res.files.length} file(s) to ${dir}`);
-    } catch (e) {
-      setError(errMessage(e));
-    } finally {
-      setPulling(undefined);
-    }
-  }
+  const [working, setWorking] = useState<string>();
 
   async function load() {
     setBusy(true);
@@ -42,6 +23,20 @@ export function AppsPanel() {
       setError(errMessage(e));
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function makeShortcut(app: DeviceApp) {
+    setWorking(app.package);
+    setError(undefined);
+    try {
+      // Build a shortcut from the current config, launching this app.
+      const path = await createShortcut(args, app.package, `${app.name} (scrcpy)`);
+      setError(`Shortcut created: ${path}`);
+    } catch (e) {
+      setError(errMessage(e));
+    } finally {
+      setWorking(undefined);
     }
   }
 
@@ -58,7 +53,7 @@ export function AppsPanel() {
     <div>
       <PanelTitle
         title="Apps"
-        desc="List installed apps and pick one to launch on start (via --start-app)."
+        desc="List installed apps. Pick one to launch on start (--start-app), or make a desktop shortcut."
       />
 
       <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -94,7 +89,7 @@ export function AppsPanel() {
         </div>
       </div>
 
-      {error && <p className="mb-2 text-xs text-red-400">{error}</p>}
+      {error && <p className="mb-2 break-words text-xs text-zinc-400">{error}</p>}
 
       {apps.length > 0 && (
         <input
@@ -116,13 +111,6 @@ export function AppsPanel() {
                 : "border-zinc-800 hover:border-zinc-700")
             }
           >
-            {icons[a.package] ? (
-              <img src={icons[a.package]} alt="" className="h-8 w-8 shrink-0 rounded" />
-            ) : (
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-zinc-800 text-xs text-zinc-500">
-                {a.name.charAt(0).toUpperCase()}
-              </span>
-            )}
             <button
               onClick={() => patch("virtualDisplay", { startApp: a.package })}
               className="min-w-0 flex-1 text-left"
@@ -132,8 +120,8 @@ export function AppsPanel() {
               <span className="block truncate font-mono text-[11px] text-zinc-500">{a.package}</span>
             </button>
             {a.system && <span className="shrink-0 text-[10px] text-zinc-600">system</span>}
-            <Button onClick={() => pull(a.package)} disabled={pulling === a.package || !selected}>
-              {pulling === a.package ? "…" : "Pull APK"}
+            <Button onClick={() => makeShortcut(a)} disabled={working === a.package} title="Create a desktop shortcut that launches this app with the current config">
+              {working === a.package ? "…" : "Shortcut"}
             </Button>
           </div>
         ))}

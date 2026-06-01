@@ -1,5 +1,4 @@
 mod adb;
-mod apk;
 mod apps;
 mod args;
 mod binary;
@@ -9,6 +8,7 @@ mod error;
 mod profiles;
 mod qr_pair;
 mod session;
+mod shortcut;
 mod state;
 
 use state::AppState;
@@ -42,7 +42,7 @@ pub fn run() {
             commands::go_wireless,
             commands::qr_pair_start,
             commands::list_apps,
-            commands::pull_apk,
+            commands::create_shortcut,
             commands::device_action,
             commands::device_screenshot,
             commands::preview_argv,

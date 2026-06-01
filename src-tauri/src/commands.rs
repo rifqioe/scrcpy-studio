@@ -170,15 +170,23 @@ pub fn list_apps(
     apps::list(&bin.scrcpy, &bin.adb, serial.as_deref(), include_system)
 }
 
+/// Create a desktop shortcut that launches scrcpy with the given config (optionally starting
+/// `package`). Returns the saved `.lnk` path.
 #[tauri::command]
-pub fn pull_apk(
+pub fn create_shortcut(
     state: State<AppState>,
-    serial: String,
-    package: String,
-    dest: String,
-) -> Result<crate::apk::PullResult> {
+    args: ScrcpyArgs,
+    package: Option<String>,
+    label: String,
+) -> Result<String> {
     let bin = state.binary.require()?;
-    crate::apk::pull(&bin.adb, &serial, &package, std::path::Path::new(&dest))
+    let mut args = args;
+    if let Some(pkg) = package {
+        args.virtual_display.start_app = Some(pkg);
+    }
+    let argv = args.to_argv()?;
+    let path = crate::shortcut::create(&bin.scrcpy, &argv, &label)?;
+    Ok(path.to_string_lossy().to_string())
 }
 
 // ---- device control (floating toolbar) ----
