@@ -94,12 +94,16 @@ impl BinaryManager {
         self.install(&version)
     }
 
-    /// Force-install the latest version (used by the "update" button).
+    /// Install the latest version if newer. If the latest is already installed, this is a
+    /// no-op — re-extracting over in-use binaries (a running adb/scrcpy) fails on Windows.
     pub fn update(&self) -> Result<Binaries> {
         let version = self.latest_version()?;
-        let dir = self.version_dir(&version);
-        std::fs::create_dir_all(&dir)?;
-        self.provider.install(&version, &dir)
+        if let Some(current) = self.current() {
+            if current.version == version {
+                return Ok(current);
+            }
+        }
+        self.install(&version)
     }
 
     /// Resolve binaries to use for a launch: prefer installed, else error with guidance.
