@@ -30,6 +30,7 @@ export function AppsPanel() {
   const [autoLoad, setAutoLoad] = useState(() => localStorage.getItem("apps.autoLoad") === "1");
   const [pullIcon, setPullIcon] = useState(() => localStorage.getItem("apps.pullIcon") === "1");
   const [icons, setIcons] = useState<Record<string, string>>(() => loadIconCache());
+  const [broken, setBroken] = useState<Set<string>>(new Set());
 
   // Auto-load the app list when the panel opens (if enabled and a device is selected).
   useEffect(() => {
@@ -48,13 +49,25 @@ export function AppsPanel() {
     localStorage.setItem("apps.pullIcon", v ? "1" : "0");
   }
 
-  // Lazily fetch missing icons from the web (cached). Concurrency-limited.
+  // Lazily fetch missing icons from the web (cached). Concurrency-limited, batched flush.
   useEffect(() => {
     if (!pullIcon || apps.length === 0) return;
     let cancelled = false;
     const cache = loadIconCache();
+    setIcons((m) => ({ ...cache, ...m })); // surface already-cached icons immediately
     const todo = apps.filter((a) => cache[a.package] === undefined).map((a) => a.package);
     if (todo.length === 0) return;
+
+    const buffer: Record<string, string> = {};
+    let dirty = false;
+    // Flush accumulated icons every 250ms instead of re-rendering on every fetch.
+    const flush = window.setInterval(() => {
+      if (dirty) {
+        dirty = false;
+        setIcons((m) => ({ ...m, ...buffer }));
+        saveIconCache(cache);
+      }
+    }, 250);
 
     let idx = 0;
     async function worker() {
@@ -67,13 +80,19 @@ export function AppsPanel() {
           url = "";
         }
         cache[pkg] = url;
-        saveIconCache(cache);
-        if (!cancelled) setIcons((m) => ({ ...m, [pkg]: url }));
+        buffer[pkg] = url;
+        dirty = true;
       }
     }
-    Promise.all(Array.from({ length: 6 }, worker));
+    Promise.all(Array.from({ length: 5 }, worker)).then(() => {
+      if (!cancelled) {
+        setIcons((m) => ({ ...m, ...buffer }));
+        saveIconCache(cache);
+      }
+    });
     return () => {
       cancelled = true;
+      window.clearInterval(flush);
     };
   }, [pullIcon, apps]);
 
@@ -176,8 +195,14 @@ export function AppsPanel() {
                 : "border-zinc-800 hover:border-zinc-700")
             }
           >
-            {icons[a.package] ? (
-              <img src={icons[a.package]} alt="" className="h-8 w-8 shrink-0 rounded" loading="lazy" />
+            {icons[a.package] && !broken.has(a.package) ? (
+              <img
+                src={icons[a.package]}
+                alt=""
+                className="h-8 w-8 shrink-0 rounded"
+                loading="lazy"
+                onError={() => setBroken((s) => new Set(s).add(a.package))}
+              />
             ) : (
               <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-zinc-800 text-xs text-zinc-500">
                 {a.name.charAt(0).toUpperCase()}

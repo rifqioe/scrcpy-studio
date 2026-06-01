@@ -188,7 +188,17 @@ pub fn icon_web(package: String) -> Result<Option<String>> {
         return Ok(None);
     }
     let body = resp.text().map_err(|e| AppError::Download(e.to_string()))?;
-    Ok(parse_og_image(&body))
+    Ok(parse_og_image(&body).map(|u| normalize_icon_url(&u)))
+}
+
+/// Ask Google's image CDN for a small square (96px) crop to keep icons light and uniform.
+fn normalize_icon_url(url: &str) -> String {
+    if url.contains("googleusercontent.com") {
+        let base = url.split('=').next().unwrap_or(url);
+        format!("{base}=s96")
+    } else {
+        url.to_string()
+    }
 }
 
 /// Extract the `og:image` content URL from an HTML page.
@@ -280,5 +290,15 @@ mod tests {
     #[test]
     fn returns_none_without_og_image() {
         assert_eq!(parse_og_image("<html>no meta</html>"), None);
+    }
+
+    #[test]
+    fn normalizes_googleusercontent_to_small_square() {
+        use super::normalize_icon_url;
+        assert_eq!(
+            normalize_icon_url("https://play-lh.googleusercontent.com/abc=w240-h480-rw"),
+            "https://play-lh.googleusercontent.com/abc=s96"
+        );
+        assert_eq!(normalize_icon_url("https://example.com/x.png"), "https://example.com/x.png");
     }
 }
