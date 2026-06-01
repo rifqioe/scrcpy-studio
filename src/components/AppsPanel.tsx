@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { MoreVertical } from "lucide-react";
 import { useConfig } from "../state/config";
 import { useDevices } from "../state/devices";
@@ -15,6 +15,20 @@ export function AppsPanel() {
   const [error, setError] = useState<string>();
   const [working, setWorking] = useState<string>();
   const [menuFor, setMenuFor] = useState<string>();
+  const [autoLoad, setAutoLoad] = useState(() => localStorage.getItem("apps.autoLoad") === "1");
+
+  // Auto-load the app list when the panel opens (if enabled and a device is selected).
+  useEffect(() => {
+    if (autoLoad && selected && apps.length === 0 && !busy) {
+      load();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoLoad, selected]);
+
+  function toggleAutoLoad(v: boolean) {
+    setAutoLoad(v);
+    localStorage.setItem("apps.autoLoad", v ? "1" : "0");
+  }
 
   async function load() {
     setBusy(true);
@@ -63,6 +77,7 @@ export function AppsPanel() {
           {busy ? "Loading…" : "Load apps"}
         </Button>
         <Toggle label="Include system apps" checked={includeSystem} onChange={setIncludeSystem} />
+        <Toggle label="Auto load" checked={autoLoad} onChange={toggleAutoLoad} />
         {!selected && <span className="text-xs text-amber-400">Select a device first.</span>}
       </div>
 
