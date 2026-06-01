@@ -30,7 +30,8 @@ export interface QrPairResult {
   success: boolean;
   message: string;
 }
-export const qrPairStart = () => invoke<QrSession>("qr_pair_start");
+export const qrPairStart = (autoConnect: boolean) =>
+  invoke<QrSession>("qr_pair_start", { autoConnect });
 export const onQrPairResult = (cb: (e: QrPairResult) => void): Promise<UnlistenFn> =>
   listen<QrPairResult>("qr-pair-result", (event) => cb(event.payload));
 

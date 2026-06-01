@@ -11,12 +11,15 @@ use crate::error::{AppError, Result};
 use mdns_sd::{ServiceDaemon, ServiceEvent};
 use rand::Rng;
 use serde::Serialize;
+use std::net::IpAddr;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter};
 
 const PAIRING_SERVICE: &str = "_adb-tls-pairing._tcp.local.";
+const CONNECT_SERVICE: &str = "_adb-tls-connect._tcp.local.";
 const BROWSE_TIMEOUT: Duration = Duration::from_secs(120);
+const CONNECT_DISCOVER_TIMEOUT: Duration = Duration::from_secs(15);
 
 /// Data the frontend needs to render the QR code and show the human-readable code.
 #[derive(Debug, Clone, Serialize)]
@@ -60,7 +63,12 @@ fn build_payload(name: &str, code: &str) -> String {
 
 /// Browse mDNS until the phone advertises the matching pairing service, then run `adb pair`.
 /// Emits `qr-pair-result` with the outcome. Runs on a background thread.
-pub fn start(app: AppHandle, adb_path: PathBuf, session: QrSession) -> Result<()> {
+pub fn start(
+    app: AppHandle,
+    adb_path: PathBuf,
+    session: QrSession,
+    auto_connect: bool,
+) -> Result<()> {
     let daemon = ServiceDaemon::new().map_err(|e| AppError::Adb(format!("mDNS init: {e}")))?;
     let receiver = daemon
         .browse(PAIRING_SERVICE)
@@ -109,7 +117,16 @@ pub fn start(app: AppHandle, adb_path: PathBuf, session: QrSession) -> Result<()
                     }
                     match adb::pair(&adb_path, &target, &session.code) {
                         Ok(out) => {
-                            emit(&app, true, &format!("Paired with {target}. {out}"));
+                            let mut msg = format!("Paired with {target}. {out}");
+                            if auto_connect {
+                                match connect_after_pair(&daemon, &adb_path, addr) {
+                                    Ok(c) => msg.push_str(&format!(" | Connected: {c}")),
+                                    Err(e) => msg.push_str(&format!(
+                                        " | Auto-connect failed: {e} — connect manually."
+                                    )),
+                                }
+                            }
+                            emit(&app, true, &msg);
                             break;
                         }
                         // Keep listening — the phone re-advertises and may succeed on a retry
@@ -126,6 +143,47 @@ pub fn start(app: AppHandle, adb_path: PathBuf, session: QrSession) -> Result<()
     });
 
     Ok(())
+}
+
+/// After pairing, discover the device's `_adb-tls-connect._tcp` endpoint and `adb connect` to
+/// it. Prefers the service whose IP matches the just-paired address.
+fn connect_after_pair(
+    daemon: &ServiceDaemon,
+    adb_path: &std::path::Path,
+    want_ip: IpAddr,
+) -> Result<String> {
+    let rx = daemon
+        .browse(CONNECT_SERVICE)
+        .map_err(|e| AppError::Adb(format!("mDNS browse (connect): {e}")))?;
+    let deadline = Instant::now() + CONNECT_DISCOVER_TIMEOUT;
+    loop {
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            return Err(AppError::Adb(
+                "could not find the connect endpoint over mDNS".into(),
+            ));
+        }
+        match rx.recv_timeout(remaining.min(Duration::from_secs(3))) {
+            Ok(ServiceEvent::ServiceResolved(info)) => {
+                let addrs = info.get_addresses();
+                // Prefer the same IP we paired with, else any IPv4.
+                let pick = addrs
+                    .iter()
+                    .find(|a| **a == want_ip)
+                    .or_else(|| addrs.iter().find(|a| a.is_ipv4()))
+                    .copied();
+                if let Some(addr) = pick {
+                    let target = format!("{addr}:{}", info.get_port());
+                    return adb::connect(adb_path, &target).map(|o| format!("{target} {o}"));
+                }
+            }
+            Ok(_) => {}
+            Err(flume::RecvTimeoutError::Disconnected) => {
+                return Err(AppError::Adb("mDNS connect browse ended".into()))
+            }
+            Err(flume::RecvTimeoutError::Timeout) => {}
+        }
+    }
 }
 
 fn emit(app: &AppHandle, success: bool, message: &str) {

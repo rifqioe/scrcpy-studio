@@ -11,7 +11,7 @@ import {
   errMessage,
   type QrSession,
 } from "../lib/ipc";
-import { Button } from "./ui";
+import { Button, Toggle } from "./ui";
 import { BinaryManager } from "./BinaryManager";
 
 export function DeviceDock() {
@@ -24,6 +24,7 @@ export function DeviceDock() {
   const [busy, setBusy] = useState(false);
   const [qr, setQr] = useState<QrSession | null>(null);
   const [qrStatus, setQrStatus] = useState<string>();
+  const [autoConnect, setAutoConnect] = useState(true);
 
   useEffect(() => {
     refresh();
@@ -64,7 +65,7 @@ export function DeviceDock() {
   async function startQr() {
     setQrStatus(undefined);
     try {
-      setQr(await qrPairStart());
+      setQr(await qrPairStart(autoConnect));
       setQrStatus("Scan in: Developer options → Wireless debugging → Pair device with QR code.");
     } catch (e) {
       setQrStatus(errMessage(e));
@@ -160,6 +161,12 @@ export function DeviceDock() {
               code <span className="font-mono text-emerald-300">{qr.code}</span>
             </div>
           )}
+          <Toggle
+            label="Auto-connect after pairing"
+            checked={autoConnect}
+            onChange={setAutoConnect}
+            hint="Discover the connect endpoint and adb connect automatically."
+          />
           {qrStatus && <p className="break-words text-[11px] text-zinc-400">{qrStatus}</p>}
         </div>
 

@@ -86,10 +86,14 @@ pub fn go_wireless(state: State<AppState>, serial: String) -> Result<String> {
 /// Start a QR wireless-pairing session: returns the QR payload to render and begins
 /// browsing mDNS for the phone. The outcome arrives via the `qr-pair-result` event.
 #[tauri::command]
-pub fn qr_pair_start(app: AppHandle, state: State<AppState>) -> Result<crate::qr_pair::QrSession> {
+pub fn qr_pair_start(
+    app: AppHandle,
+    state: State<AppState>,
+    auto_connect: bool,
+) -> Result<crate::qr_pair::QrSession> {
     let bin = state.binary.require()?;
     let session = crate::qr_pair::new_session();
-    crate::qr_pair::start(app, bin.adb.clone(), session.clone())?;
+    crate::qr_pair::start(app, bin.adb.clone(), session.clone(), auto_connect)?;
     Ok(session)
 }
 
