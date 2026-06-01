@@ -12,9 +12,14 @@ body {
   background: #18181b;
 }
 
-/* Dark scrollbars (WebView2 / Chromium) to match the dark UI. */
+/* Dark, auto-hiding scrollbars (WebView2 / Chromium): thumb is invisible until you hover
+   the scrollable area. */
 * {
   scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+*:hover {
   scrollbar-color: #3f3f46 transparent;
 }
 
@@ -28,10 +33,14 @@ body {
 }
 
 *::-webkit-scrollbar-thumb {
-  background-color: #3f3f46;
+  background-color: transparent;
   border-radius: 9999px;
   border: 2px solid transparent;
   background-clip: content-box;
+}
+
+*:hover::-webkit-scrollbar-thumb {
+  background-color: #3f3f46;
 }
 
 *::-webkit-scrollbar-thumb:hover {
