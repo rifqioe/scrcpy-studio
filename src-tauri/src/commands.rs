@@ -170,6 +170,18 @@ pub fn list_apps(
     apps::list(&bin.scrcpy, &bin.adb, serial.as_deref(), include_system)
 }
 
+/// Download an app's APK file(s) to `dest`. Returns saved paths.
+#[tauri::command]
+pub fn pull_apk(
+    state: State<AppState>,
+    serial: String,
+    package: String,
+    dest: String,
+) -> Result<Vec<String>> {
+    let bin = state.binary.require()?;
+    crate::apk::pull(&bin.adb, &serial, &package, std::path::Path::new(&dest))
+}
+
 /// Look up an app's icon URL from its Google Play listing (og:image). Returns None if the
 /// package isn't on Play or has no icon. Network only — installs nothing, pulls no APK.
 #[tauri::command]
@@ -226,11 +238,13 @@ pub fn create_shortcut(
     label: String,
     icon_url: Option<String>,
 ) -> Result<String> {
-    let bin = state.binary.require()?;
+    let _bin = state.binary.require()?; // ensure scrcpy is installed before making a shortcut
     let mut args = args;
     if let Some(pkg) = &package {
         args.virtual_display.start_app = Some(pkg.clone());
     }
+    // Shortcuts always launch the app into a fresh virtual display.
+    args.virtual_display.enabled = true;
     let argv = args.to_argv()?;
 
     // Build a .ico from the app's web icon so the shortcut shows the app, not scrcpy.
@@ -241,7 +255,12 @@ pub fn create_shortcut(
         _ => None,
     };
 
-    let path = crate::shortcut::create(&bin.scrcpy, &argv, &label, icon.as_deref())?;
+    // Target our own exe in --launch mode so scrcpy starts silently (no console window).
+    let exe = std::env::current_exe().map_err(|e| AppError::Io(e.to_string()))?;
+    let mut launch_args = vec!["--launch".to_string()];
+    launch_args.extend(argv);
+
+    let path = crate::shortcut::create(&exe, &launch_args, &label, icon.as_deref())?;
     Ok(path.to_string_lossy().to_string())
 }
 

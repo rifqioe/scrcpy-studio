@@ -23,15 +23,15 @@ fn join_args(argv: &[String]) -> String {
 }
 
 #[cfg(windows)]
-pub fn create(scrcpy: &Path, argv: &[String], label: &str, icon: Option<&Path>) -> Result<PathBuf> {
+pub fn create(target: &Path, args: &[String], label: &str, icon: Option<&Path>) -> Result<PathBuf> {
     let desktop = dirs::desktop_dir()
         .ok_or_else(|| AppError::NotFound("desktop directory".into()))?;
     let name = format!("{}.lnk", sanitize(label));
     let path = desktop.join(name);
 
-    let mut link = mslnk::ShellLink::new(scrcpy).map_err(|e| AppError::Io(e.to_string()))?;
-    link.set_arguments(Some(join_args(argv)));
-    if let Some(dir) = scrcpy.parent() {
+    let mut link = mslnk::ShellLink::new(target).map_err(|e| AppError::Io(e.to_string()))?;
+    link.set_arguments(Some(join_args(args)));
+    if let Some(dir) = target.parent() {
         link.set_working_dir(Some(dir.to_string_lossy().to_string()));
     }
     if let Some(icon) = icon {
@@ -42,7 +42,7 @@ pub fn create(scrcpy: &Path, argv: &[String], label: &str, icon: Option<&Path>) 
 }
 
 #[cfg(not(windows))]
-pub fn create(_scrcpy: &Path, _argv: &[String], _label: &str, _icon: Option<&Path>) -> Result<PathBuf> {
+pub fn create(_target: &Path, _args: &[String], _label: &str, _icon: Option<&Path>) -> Result<PathBuf> {
     Err(AppError::InvalidArgs(
         "desktop shortcuts are only implemented on Windows so far".into(),
     ))

@@ -1,4 +1,5 @@
 mod adb;
+mod apk;
 mod apps;
 mod args;
 mod binary;
@@ -13,6 +14,57 @@ mod state;
 
 use state::AppState;
 use tauri::Manager;
+
+/// Resolve the same app-data directory Tauri uses, without a running app instance.
+fn data_dir() -> std::path::PathBuf {
+    let base = dirs::data_dir().unwrap_or_else(|| std::path::PathBuf::from("."));
+    base.join("com.rifqioe.scrcpy-studio")
+}
+
+/// Headless entry used by desktop shortcuts: spawn scrcpy with the given argv, detached and
+/// with no console window, using the bundled binaries. Then exit immediately.
+pub fn headless_launch(scrcpy_argv: &[String]) {
+    let mgr = binary::BinaryManager::new(data_dir(), make_provider());
+    let Ok(bin) = mgr.require() else {
+        return;
+    };
+    let mut cmd = std::process::Command::new(&bin.scrcpy);
+    cmd.args(scrcpy_argv).env("ADB", &bin.adb);
+    if let Some(dir) = bin.scrcpy.parent() {
+        cmd.current_dir(dir);
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        const DETACHED_PROCESS: u32 = 0x0000_0008;
+        cmd.creation_flags(CREATE_NO_WINDOW | DETACHED_PROCESS);
+    }
+    let _ = cmd.spawn();
+}
+
+#[cfg(target_os = "windows")]
+fn make_provider() -> Box<dyn binary::BinaryProvider> {
+    Box::new(binary::windows::WindowsProvider::new())
+}
+
+#[cfg(not(target_os = "windows"))]
+fn make_provider() -> Box<dyn binary::BinaryProvider> {
+    // Headless launch is Windows-first; other platforms get a no-op provider.
+    struct NoProvider;
+    impl binary::BinaryProvider for NoProvider {
+        fn latest_version(&self) -> error::Result<String> {
+            Err(error::AppError::BinaryMissing("unsupported".into()))
+        }
+        fn install(&self, _v: &str, _d: &std::path::Path) -> error::Result<binary::Binaries> {
+            Err(error::AppError::BinaryMissing("unsupported".into()))
+        }
+        fn locate(&self, _d: &std::path::Path, _v: &str) -> Option<binary::Binaries> {
+            None
+        }
+    }
+    Box::new(NoProvider)
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -43,6 +95,7 @@ pub fn run() {
             commands::qr_pair_start,
             commands::list_apps,
             commands::icon_web,
+            commands::pull_apk,
             commands::create_shortcut,
             commands::device_action,
             commands::device_screenshot,

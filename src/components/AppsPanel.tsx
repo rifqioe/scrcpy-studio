@@ -1,8 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
 import { MoreVertical } from "lucide-react";
+import { open } from "@tauri-apps/plugin-dialog";
 import { useConfig } from "../state/config";
 import { useDevices } from "../state/devices";
-import { listApps, createShortcut, iconWeb, errMessage, type DeviceApp } from "../lib/ipc";
+import { useSessions } from "../state/sessions";
+import {
+  listApps,
+  createShortcut,
+  iconWeb,
+  launch,
+  pullApk,
+  errMessage,
+  type DeviceApp,
+} from "../lib/ipc";
 
 // Persistent icon-URL cache (package → url, or "" when none found on the web).
 function loadIconCache(): Record<string, string> {
@@ -20,6 +30,7 @@ import { Button, PanelTitle, Toggle } from "./ui";
 export function AppsPanel() {
   const { args, patch } = useConfig();
   const selected = useDevices((s) => s.selected);
+  const addSession = useSessions((s) => s.add);
   const [apps, setApps] = useState<DeviceApp[]>([]);
   const [query, setQuery] = useState("");
   const [includeSystem, setIncludeSystem] = useState(false);
@@ -105,6 +116,37 @@ export function AppsPanel() {
       setError(errMessage(e));
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function launchApp(app: DeviceApp) {
+    setWorking(app.package);
+    setError(undefined);
+    try {
+      const a = { ...args, virtualDisplay: { ...args.virtualDisplay, startApp: app.package } };
+      const info = await launch(a);
+      addSession(info);
+      patch("virtualDisplay", { startApp: app.package });
+    } catch (e) {
+      setError(errMessage(e));
+    } finally {
+      setWorking(undefined);
+    }
+  }
+
+  async function downloadApk(app: DeviceApp) {
+    if (!selected) return;
+    const dir = await open({ directory: true, title: "Save APK to…" });
+    if (typeof dir !== "string") return;
+    setWorking(app.package);
+    setError(undefined);
+    try {
+      const files = await pullApk(selected, app.package, dir);
+      setError(`Saved ${files.length} file(s) to ${dir}`);
+    } catch (e) {
+      setError(errMessage(e));
+    } finally {
+      setWorking(undefined);
     }
   }
 
@@ -231,10 +273,22 @@ export function AppsPanel() {
                   <div className="fixed inset-0 z-30" onClick={() => setMenuFor(undefined)} />
                   <div className="absolute right-0 top-full z-40 mt-1 min-w-[12rem] rounded-md border border-zinc-700 bg-zinc-900 py-1 shadow-xl">
                     <button
+                      onClick={() => { setMenuFor(undefined); launchApp(a); }}
+                      className="block w-full px-3 py-1.5 text-left text-sm text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100"
+                    >
+                      Launch
+                    </button>
+                    <button
                       onClick={() => { setMenuFor(undefined); makeShortcut(a); }}
                       className="block w-full px-3 py-1.5 text-left text-sm text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100"
                     >
                       Create Desktop Shortcut
+                    </button>
+                    <button
+                      onClick={() => { setMenuFor(undefined); downloadApk(a); }}
+                      className="block w-full px-3 py-1.5 text-left text-sm text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100"
+                    >
+                      Download APK
                     </button>
                   </div>
                 </>
