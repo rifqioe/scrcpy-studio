@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { DeviceDock } from "./components/DeviceDock";
 import { SessionList } from "./components/SessionList";
-import { ProfileBar } from "./components/ProfileBar";
 import { CommandBar } from "./components/CommandBar";
 import { ShortcutsPanel } from "./components/ShortcutsPanel";
 import { AppsPanel } from "./components/AppsPanel";
@@ -55,7 +54,6 @@ export default function App() {
 
       <main className="flex min-w-0 flex-1 flex-col">
         <MenuBar onSelectTab={setActive} />
-        <ProfileBar />
 
         <nav className="flex gap-1 overflow-x-auto border-b border-zinc-800 bg-zinc-950 px-2 py-1.5">
           {TABS.map((t) => (

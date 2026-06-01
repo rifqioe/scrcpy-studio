@@ -1,43 +1,75 @@
-// Top application menu bar with dropdown menus.
-import { useState, type ReactNode } from "react";
+// Top application menu bar: App, Profiles, Help.
+import { useEffect, useState, type ReactNode } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { binaryUpdate, errMessage } from "../lib/ipc";
+import { useConfig } from "../state/config";
+import {
+  binaryUpdate,
+  profileDelete,
+  profileList,
+  profileLoad,
+  profileSave,
+  errMessage,
+} from "../lib/ipc";
 
 const SCRCPY_DOCS = "https://github.com/Genymobile/scrcpy/tree/master/doc";
 const APP_REPO = "https://github.com/rifqioe/scrcpy-studio";
 
-// Panels reachable from the Command menu (must match the tab ids in App.tsx).
-const COMMAND_PANELS: { id: string; label: string }[] = [
-  { id: "connect", label: "Connect" },
-  { id: "video", label: "Video" },
-  { id: "audio", label: "Audio" },
-  { id: "camera", label: "Camera" },
-  { id: "control", label: "Control" },
-  { id: "input", label: "Input" },
-  { id: "window", label: "Window" },
-  { id: "record", label: "Record" },
-  { id: "vdisplay", label: "Virtual display" },
-  { id: "general", label: "General" },
-];
-
 export function MenuBar({ onSelectTab }: { onSelectTab: (id: string) => void }) {
+  const { args, setArgs, reset } = useConfig();
   const [open, setOpen] = useState<string | null>(null);
   const [note, setNote] = useState<string>();
+  const [profiles, setProfiles] = useState<string[]>([]);
+  const [name, setName] = useState("");
 
   const toggle = (id: string) => setOpen((o) => (o === id ? null : id));
   const close = () => setOpen(null);
 
-  const select = (tab: string) => {
-    onSelectTab(tab);
-    close();
-  };
+  async function refreshProfiles() {
+    try {
+      setProfiles(await profileList());
+    } catch {
+      /* ignore */
+    }
+  }
+  useEffect(() => {
+    refreshProfiles();
+  }, []);
 
   async function updateScrcpy() {
     close();
-    setNote("Updating scrcpy…");
+    setNote("Checking scrcpy…");
     try {
       const bin = await binaryUpdate();
-      setNote(`scrcpy updated to ${bin.version}`);
+      setNote(`scrcpy ${bin.version} (latest)`);
+    } catch (e) {
+      setNote(errMessage(e));
+    }
+  }
+
+  async function saveProfile() {
+    if (!name.trim()) return;
+    try {
+      await profileSave(name, args);
+      setNote(`Saved profile "${name}"`);
+      await refreshProfiles();
+    } catch (e) {
+      setNote(errMessage(e));
+    }
+  }
+  async function loadProfile(n: string) {
+    try {
+      setArgs(await profileLoad(n));
+      setName(n);
+      setNote(`Loaded "${n}"`);
+      close();
+    } catch (e) {
+      setNote(errMessage(e));
+    }
+  }
+  async function deleteProfile(n: string) {
+    try {
+      await profileDelete(n);
+      await refreshProfiles();
     } catch (e) {
       setNote(errMessage(e));
     }
@@ -47,33 +79,50 @@ export function MenuBar({ onSelectTab }: { onSelectTab: (id: string) => void }) 
     <div className="relative z-40 flex items-center gap-0.5 border-b border-zinc-800 bg-zinc-950 px-2 py-1 text-sm">
       {open && <div className="fixed inset-0 z-30" onClick={close} />}
 
-      <Menu id="command" label="Command" open={open} onToggle={toggle}>
-        {COMMAND_PANELS.map((p) => (
-          <Item key={p.id} onClick={() => select(p.id)}>
-            {p.label}
-          </Item>
-        ))}
+      <Menu id="app" label="App" open={open} onToggle={toggle}>
+        <Item onClick={updateScrcpy}>Update scrcpy</Item>
+        <Item onClick={() => { openUrl(APP_REPO); close(); }}>About scrcpy-studio ↗</Item>
       </Menu>
 
-      <button
-        className="rounded px-2.5 py-1 text-zinc-300 hover:bg-zinc-800"
-        onClick={() => select("apps")}
-      >
-        Apps
-      </button>
-
-      <Menu id="settings" label="Settings" open={open} onToggle={toggle}>
-        <Item onClick={updateScrcpy}>Update scrcpy</Item>
+      <Menu id="profiles" label="Profiles" open={open} onToggle={toggle}>
+        <div className="flex gap-1 px-2 py-1.5">
+          <input
+            className="min-w-0 flex-1 rounded border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs text-zinc-100 outline-none focus:border-emerald-500"
+            placeholder="profile name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+          <button
+            onClick={saveProfile}
+            disabled={!name.trim()}
+            className="rounded bg-emerald-600 px-2 text-xs text-white hover:bg-emerald-500 disabled:opacity-40"
+          >
+            Save
+          </button>
+        </div>
+        {profiles.length > 0 && <div className="my-1 h-px bg-zinc-800" />}
+        {profiles.map((p) => (
+          <div key={p} className="flex items-center justify-between px-3 py-1 hover:bg-zinc-800">
+            <button className="flex-1 truncate text-left text-sm text-zinc-300" onClick={() => loadProfile(p)}>
+              {p}
+            </button>
+            <button className="ml-2 text-zinc-600 hover:text-red-400" onClick={() => deleteProfile(p)} title="Delete">
+              ×
+            </button>
+          </div>
+        ))}
+        <div className="my-1 h-px bg-zinc-800" />
+        <Item onClick={() => { reset(); setName(""); close(); setNote("Config reset"); }}>Reset config</Item>
       </Menu>
 
       <Menu id="help" label="Help" open={open} onToggle={toggle}>
-        <Item onClick={() => select("shortcuts")}>Keyboard shortcuts</Item>
+        <Item onClick={() => { onSelectTab("shortcuts"); close(); }}>Keyboard shortcuts</Item>
         <Item onClick={() => { openUrl(SCRCPY_DOCS); close(); }}>scrcpy documentation ↗</Item>
         <Item onClick={() => { openUrl(APP_REPO); close(); }}>scrcpy-studio on GitHub ↗</Item>
         <Item onClick={() => { openUrl(`${APP_REPO}#readme`); close(); }}>scrcpy-studio docs ↗</Item>
       </Menu>
 
-      {note && <span className="ml-auto truncate text-[11px] text-zinc-500">{note}</span>}
+      {note && <span className="ml-auto truncate pl-2 text-[11px] text-zinc-500">{note}</span>}
     </div>
   );
 }
@@ -103,7 +152,7 @@ function Menu({
         {label}
       </button>
       {open === id && (
-        <div className="absolute left-0 top-full z-40 mt-1 min-w-[12rem] rounded-md border border-zinc-700 bg-zinc-900 py-1 shadow-xl">
+        <div className="absolute left-0 top-full z-40 mt-1 min-w-[14rem] rounded-md border border-zinc-700 bg-zinc-900 py-1 shadow-xl">
           {children}
         </div>
       )}
