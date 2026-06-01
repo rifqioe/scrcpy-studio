@@ -44,12 +44,21 @@ fn keycode(action: &str) -> Option<&'static str> {
         "mute" => "164",      // VOLUME_MUTE
         "wake" => "224",      // KEYCODE_WAKEUP
         "sleep" => "223",     // KEYCODE_SLEEP
+        "copy" => "278",      // KEYCODE_COPY
+        "paste" => "279",     // KEYCODE_PASTE
+        "cut" => "277",       // KEYCODE_CUT
         _ => return None,
     })
 }
 
 /// Perform a device action. Keycode-backed actions plus a few system commands.
+/// An action prefixed `hold_` is sent as a long-press (e.g. `hold_power` → power menu).
 pub fn action(adb: &Path, serial: &str, action: &str) -> Result<()> {
+    if let Some(rest) = action.strip_prefix("hold_") {
+        if let Some(code) = keycode(rest) {
+            return run(adb, serial, &["shell", "input", "keyevent", "--longpress", code]);
+        }
+    }
     if let Some(code) = keycode(action) {
         return run(adb, serial, &["shell", "input", "keyevent", code]);
     }

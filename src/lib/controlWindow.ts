@@ -10,8 +10,8 @@ export async function openControlWindow(serial: string): Promise<void> {
   const win = new WebviewWindow("control", {
     url: `index.html?serial=${encodeURIComponent(serial)}`,
     title: "Device controls",
-    width: 214,
-    height: 240,
+    width: 56,
+    height: 620,
     resizable: false,
     decorations: false,
     alwaysOnTop: true,
