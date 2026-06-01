@@ -225,11 +225,20 @@ export function VirtualDisplayPanel() {
 }
 
 export function GeneralPanel() {
-  const { args, patch, setExtraArgs } = useConfig();
+  const { args, patch, setExtraArgs, reset } = useConfig();
   const g = args.general;
   return (
     <div>
-      <PanelTitle title="General" desc="Misc options and raw flag passthrough." />
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <PanelTitle title="Other" desc="Misc options and raw flag passthrough." />
+        <button
+          onClick={reset}
+          className="shrink-0 rounded-md border border-zinc-700 px-3 py-1.5 text-sm text-zinc-300 hover:border-red-500 hover:text-red-400"
+          title="Reset all configuration to defaults"
+        >
+          Reset to default
+        </button>
+      </div>
       <Grid>
         <SelectField label="Verbosity (-V)" value={g.verbosity} options={opt("verbose", "debug", "info", "warn", "error")} onChange={(x) => patch("general", { verbosity: x })} />
         <SelectField label="Pause on exit" value={g.pauseOnExit} options={opt("true", "false", "if-error")} onChange={(x) => patch("general", { pauseOnExit: x })} />

@@ -1,10 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { DeviceDock } from "./components/DeviceDock";
 import { SessionList } from "./components/SessionList";
 import { CommandBar } from "./components/CommandBar";
 import { ShortcutsPanel } from "./components/ShortcutsPanel";
-import { AppsPanel } from "./components/AppsPanel";
-import { MenuBar } from "./components/MenuBar";
 import {
   AudioPanel,
   CameraPanel,
@@ -17,22 +15,39 @@ import {
   VirtualDisplayPanel,
   WindowPanel,
 } from "./components/panels";
+import { AppsPanel } from "./components/AppsPanel";
+import { MenuBar } from "./components/MenuBar";
 import { binaryCurrent } from "./lib/ipc";
 
-const TABS = [
-  { id: "connect", label: "Connect", el: <ConnectPanel /> },
-  { id: "video", label: "Video", el: <VideoPanel /> },
-  { id: "audio", label: "Audio", el: <AudioPanel /> },
-  { id: "camera", label: "Camera", el: <CameraPanel /> },
-  { id: "control", label: "Control", el: <ControlPanel /> },
-  { id: "input", label: "Input", el: <InputPanel /> },
-  { id: "window", label: "Window", el: <WindowPanel /> },
-  { id: "record", label: "Record", el: <RecordPanel /> },
-  { id: "vdisplay", label: "Virtual display", el: <VirtualDisplayPanel /> },
-  { id: "apps", label: "Apps", el: <AppsPanel /> },
-  { id: "general", label: "General", el: <GeneralPanel /> },
-  { id: "shortcuts", label: "Shortcuts", el: <ShortcutsPanel /> },
+// The visible configuration tab bar.
+const TAB_BAR: { id: string; label: string }[] = [
+  { id: "connect", label: "Connect" },
+  { id: "video", label: "Video" },
+  { id: "audio", label: "Audio" },
+  { id: "camera", label: "Camera" },
+  { id: "control", label: "Control" },
+  { id: "input", label: "Input" },
+  { id: "window", label: "Window" },
+  { id: "record", label: "Record" },
+  { id: "vdisplay", label: "Virtual display" },
+  { id: "other", label: "Other" },
 ];
+
+// All views, including ones reached via the menu bar (Apps, Shortcuts).
+const VIEWS: Record<string, ReactNode> = {
+  connect: <ConnectPanel />,
+  video: <VideoPanel />,
+  audio: <AudioPanel />,
+  camera: <CameraPanel />,
+  control: <ControlPanel />,
+  input: <InputPanel />,
+  window: <WindowPanel />,
+  record: <RecordPanel />,
+  vdisplay: <VirtualDisplayPanel />,
+  other: <GeneralPanel />,
+  apps: <AppsPanel />,
+  shortcuts: <ShortcutsPanel />,
+};
 
 export default function App() {
   const [active, setActive] = useState("connect");
@@ -56,7 +71,7 @@ export default function App() {
         <MenuBar onSelectTab={setActive} />
 
         <nav className="flex gap-1 overflow-x-auto border-b border-zinc-800 bg-zinc-950 px-2 py-1.5">
-          {TABS.map((t) => (
+          {TAB_BAR.map((t) => (
             <button
               key={t.id}
               onClick={() => setActive(t.id)}
@@ -72,7 +87,7 @@ export default function App() {
           ))}
         </nav>
 
-        <div className="flex-1 overflow-y-auto p-5">{TABS.find((t) => t.id === active)?.el}</div>
+        <div className="flex-1 overflow-y-auto p-5">{VIEWS[active] ?? VIEWS.connect}</div>
 
         <CommandBar hasBinary={hasBinary} />
       </main>
