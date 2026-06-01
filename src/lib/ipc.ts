@@ -43,6 +43,21 @@ export const listSessions = () => invoke<SessionInfo[]>("list_sessions");
 export const scrcpyList = (kind: string, serial?: string) =>
   invoke<string>("scrcpy_list", { kind, serial });
 
+// ---- app launcher ----
+export interface DeviceApp {
+  name: string;
+  package: string;
+  system: boolean;
+}
+export const listApps = (serial: string | undefined, includeSystem: boolean) =>
+  invoke<DeviceApp[]>("list_apps", { serial, includeSystem });
+
+// ---- device control ----
+export const deviceAction = (serial: string, action: string) =>
+  invoke<void>("device_action", { serial, action });
+export const deviceScreenshot = (serial: string, stamp: number) =>
+  invoke<string>("device_screenshot", { serial, stamp: String(stamp) });
+
 // ---- profiles ----
 export const profileSave = (name: string, args: ScrcpyArgs) =>
   invoke<void>("profile_save", { name, args });

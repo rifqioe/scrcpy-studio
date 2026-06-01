@@ -1,7 +1,9 @@
 //! Tauri command handlers — thin wrappers over the core modules.
 
 use crate::adb::{self, Device};
+use crate::apps::{self, App};
 use crate::args::ScrcpyArgs;
+use crate::control;
 use crate::binary::Binaries;
 use crate::error::{AppError, Result};
 use crate::session::SessionInfo;
@@ -153,6 +155,35 @@ pub fn scrcpy_list(state: State<AppState>, kind: String, serial: Option<String>)
         text.push_str(&stderr);
     }
     Ok(text)
+}
+
+// ---- app launcher ----
+
+#[tauri::command]
+pub fn list_apps(
+    state: State<AppState>,
+    serial: Option<String>,
+    include_system: bool,
+) -> Result<Vec<App>> {
+    let bin = state.binary.require()?;
+    apps::list(&bin.scrcpy, &bin.adb, serial.as_deref(), include_system)
+}
+
+// ---- device control (floating toolbar) ----
+
+#[tauri::command]
+pub fn device_action(state: State<AppState>, serial: String, action: String) -> Result<()> {
+    let bin = state.binary.require()?;
+    control::action(&bin.adb, &serial, &action)
+}
+
+/// `stamp` is a caller-supplied timestamp used to name the PNG. Returns the saved path.
+#[tauri::command]
+pub fn device_screenshot(state: State<AppState>, serial: String, stamp: String) -> Result<String> {
+    let bin = state.binary.require()?;
+    let dir = state.data_dir.join("screenshots");
+    let path = control::screenshot(&bin.adb, &serial, &dir, &stamp)?;
+    Ok(path.to_string_lossy().to_string())
 }
 
 // ---- profiles ----

@@ -44,6 +44,12 @@ cargo test --manifest-path src-tauri/Cargo.toml   # Rust unit tests
 npm run tauri build   # produce a release bundle
 ```
 
+## Acknowledgements
+
+- [scrcpy](https://github.com/Genymobile/scrcpy) by Genymobile — the engine this GUI drives.
+- The floating device-control panel is inspired by
+  [guiscrcpy](https://github.com/srevinsaju/guiscrcpy) (now archived).
+
 ## License
 
 [MIT](./LICENSE)

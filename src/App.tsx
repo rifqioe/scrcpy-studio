@@ -4,6 +4,8 @@ import { SessionList } from "./components/SessionList";
 import { ProfileBar } from "./components/ProfileBar";
 import { CommandBar } from "./components/CommandBar";
 import { ShortcutsPanel } from "./components/ShortcutsPanel";
+import { AppsPanel } from "./components/AppsPanel";
+import { ControlToolbar } from "./components/ControlToolbar";
 import {
   AudioPanel,
   CameraPanel,
@@ -28,6 +30,7 @@ const TABS = [
   { id: "window", label: "Window", el: <WindowPanel /> },
   { id: "record", label: "Record", el: <RecordPanel /> },
   { id: "vdisplay", label: "Virtual display", el: <VirtualDisplayPanel /> },
+  { id: "apps", label: "Apps", el: <AppsPanel /> },
   { id: "general", label: "General", el: <GeneralPanel /> },
   { id: "shortcuts", label: "Shortcuts", el: <ShortcutsPanel /> },
 ];
@@ -76,6 +79,7 @@ export default function App() {
       </main>
 
       <SessionList />
+      <ControlToolbar />
     </div>
   );
 }

@@ -1,7 +1,9 @@
 mod adb;
+mod apps;
 mod args;
 mod binary;
 mod commands;
+mod control;
 mod error;
 mod profiles;
 mod qr_pair;
@@ -38,6 +40,9 @@ pub fn run() {
             commands::adb_tcpip,
             commands::go_wireless,
             commands::qr_pair_start,
+            commands::list_apps,
+            commands::device_action,
+            commands::device_screenshot,
             commands::preview_argv,
             commands::launch,
             commands::stop_session,
