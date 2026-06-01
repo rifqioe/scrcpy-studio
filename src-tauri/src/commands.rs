@@ -1,0 +1,149 @@
+//! Tauri command handlers — thin wrappers over the core modules.
+
+use crate::adb::{self, Device};
+use crate::args::ScrcpyArgs;
+use crate::binary::Binaries;
+use crate::error::{AppError, Result};
+use crate::session::SessionInfo;
+use crate::state::AppState;
+use std::process::Command;
+use tauri::{AppHandle, State};
+
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
+// ---- Binary management ----
+
+#[tauri::command]
+pub fn binary_current(state: State<AppState>) -> Option<Binaries> {
+    state.binary.current()
+}
+
+#[tauri::command]
+pub fn binary_latest_version(state: State<AppState>) -> Result<String> {
+    state.binary.latest_version()
+}
+
+#[tauri::command]
+pub fn binary_install_latest(state: State<AppState>) -> Result<Binaries> {
+    state.binary.ensure_latest()
+}
+
+#[tauri::command]
+pub fn binary_update(state: State<AppState>) -> Result<Binaries> {
+    state.binary.update()
+}
+
+// ---- adb ----
+
+#[tauri::command]
+pub fn list_devices(state: State<AppState>) -> Result<Vec<Device>> {
+    let bin = state.binary.require()?;
+    adb::devices(&bin.adb)
+}
+
+#[tauri::command]
+pub fn adb_connect(state: State<AppState>, addr: String) -> Result<String> {
+    let bin = state.binary.require()?;
+    adb::connect(&bin.adb, &addr)
+}
+
+#[tauri::command]
+pub fn adb_disconnect(state: State<AppState>, addr: String) -> Result<String> {
+    let bin = state.binary.require()?;
+    adb::disconnect(&bin.adb, &addr)
+}
+
+#[tauri::command]
+pub fn adb_pair(state: State<AppState>, addr: String, code: String) -> Result<String> {
+    let bin = state.binary.require()?;
+    adb::pair(&bin.adb, &addr, &code)
+}
+
+#[tauri::command]
+pub fn adb_tcpip(state: State<AppState>, serial: String, port: u16) -> Result<String> {
+    let bin = state.binary.require()?;
+    adb::tcpip(&bin.adb, &serial, port)
+}
+
+// ---- scrcpy launch / sessions ----
+
+#[tauri::command]
+pub fn preview_argv(args: ScrcpyArgs) -> Result<String> {
+    args.preview()
+}
+
+#[tauri::command]
+pub fn launch(app: AppHandle, state: State<AppState>, args: ScrcpyArgs) -> Result<SessionInfo> {
+    let bin = state.binary.require()?;
+    let argv = args.to_argv()?;
+    state.sessions.launch(&app, &bin, argv)
+}
+
+#[tauri::command]
+pub fn stop_session(state: State<AppState>, id: u32) -> Result<()> {
+    state.sessions.stop(id)
+}
+
+#[tauri::command]
+pub fn list_sessions(state: State<AppState>) -> Vec<SessionInfo> {
+    state.sessions.list()
+}
+
+/// Run one of scrcpy's `--list-*` commands and return its combined output, used to
+/// populate dropdowns (cameras, displays, encoders, apps, camera sizes).
+#[tauri::command]
+pub fn scrcpy_list(state: State<AppState>, kind: String, serial: Option<String>) -> Result<String> {
+    let flag = match kind.as_str() {
+        "cameras" => "--list-cameras",
+        "camera-sizes" => "--list-camera-sizes",
+        "displays" => "--list-displays",
+        "encoders" => "--list-encoders",
+        "apps" => "--list-apps",
+        other => return Err(AppError::InvalidArgs(format!("unknown list kind: {other}"))),
+    };
+    let bin = state.binary.require()?;
+
+    let mut cmd = Command::new(&bin.scrcpy);
+    cmd.env("ADB", &bin.adb);
+    if let Some(serial) = serial.filter(|s| !s.is_empty()) {
+        cmd.arg("-s").arg(serial);
+    }
+    cmd.arg(flag);
+    #[cfg(windows)]
+    cmd.creation_flags(CREATE_NO_WINDOW);
+
+    let out = cmd
+        .output()
+        .map_err(|e| AppError::Session(format!("failed to run scrcpy {flag}: {e}")))?;
+    let mut text = String::from_utf8_lossy(&out.stdout).to_string();
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    if !stderr.trim().is_empty() {
+        text.push_str(&stderr);
+    }
+    Ok(text)
+}
+
+// ---- profiles ----
+
+#[tauri::command]
+pub fn profile_save(state: State<AppState>, name: String, args: ScrcpyArgs) -> Result<()> {
+    crate::profiles::save(&state.data_dir, &name, &args)
+}
+
+#[tauri::command]
+pub fn profile_load(state: State<AppState>, name: String) -> Result<ScrcpyArgs> {
+    crate::profiles::load(&state.data_dir, &name)
+}
+
+#[tauri::command]
+pub fn profile_list(state: State<AppState>) -> Result<Vec<String>> {
+    crate::profiles::list(&state.data_dir)
+}
+
+#[tauri::command]
+pub fn profile_delete(state: State<AppState>, name: String) -> Result<()> {
+    crate::profiles::delete(&state.data_dir, &name)
+}

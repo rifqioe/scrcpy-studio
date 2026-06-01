@@ -1,0 +1,105 @@
+scrcpy 4.0 <https://github.com/Genymobile/scrcpy>
+
+Authoritative flag reference captured from `scrcpy.exe --help` (scrcpy-win64-v4.0).
+The `args` model and `to_argv` builder are grounded against this list rather than recalled
+knowledge. When bumping the bundled scrcpy version, recapture this file and reconcile the
+model.
+
+Options (flag => model field):
+
+    --always-on-top                  window.always_on_top
+    --angle=degrees                  video.angle
+    --audio-bit-rate=value           audio.bit_rate
+    --audio-buffer=ms                audio.buffer
+    --audio-codec=name               audio.codec (opus|aac|flac|raw)
+    --audio-encoder=name             audio.encoder
+    --audio-dup                      audio.dup
+    --audio-source=source            audio.source (output|playback|mic|...)
+    --no-audio                       audio.no_audio
+    --no-audio-playback              audio.no_audio_playback
+    --require-audio                  audio.require_audio
+    -b, --video-bit-rate=value       video.bit_rate
+    --background-color=hexcolor      window.background_color
+    --camera-ar=ar                   camera.ar
+    --camera-facing=facing           camera.facing (front|back|external)
+    --camera-fps=value               camera.fps
+    --camera-high-speed              camera.high_speed
+    --camera-id=id                   camera.id
+    --camera-size=WxH                camera.size
+    --camera-torch                   camera.torch
+    --camera-zoom=zoom               camera.zoom
+    --capture-orientation=value      video.capture_orientation
+    --crop=width:height:x:y          video.crop
+    -d, --select-usb                 connect.select_usb
+    --disable-screensaver            window.disable_screensaver
+    --display-id=id                  video.display_id
+    --display-orientation=value      video.display_orientation
+    -e, --select-tcpip               connect.select_tcpip
+    -f, --fullscreen                 window.fullscreen
+    --force-adb-forward              connect.force_adb_forward
+    --gamepad=mode                   input.gamepad (disabled|uhid|aoa)
+    --keep-active                    control.keep_active
+    --keyboard=mode                  input.keyboard (disabled|sdk|uhid|aoa)
+    --kill-adb-on-close              general.kill_adb_on_close
+    --legacy-paste                   control.legacy_paste
+    -m, --max-size=value             video.max_size
+    --max-fps=value                  video.max_fps
+    --mouse=mode                     input.mouse (disabled|sdk|uhid|aoa)
+    --mouse-bind=xxxx[:xxxx]         input.mouse_bind
+    -n, --no-control                 control.no_control
+    -N, --no-playback                record.no_playback
+    --new-display[=[WxH][/dpi]]      virtual_display.enabled + new_display
+    --no-cleanup                     general.no_cleanup
+    --no-clipboard-autosync          control.no_clipboard_autosync
+    --no-key-repeat                  input.no_key_repeat
+    --no-mipmaps                     general.no_mipmaps
+    --no-mouse-hover                 input.no_mouse_hover
+    --no-power-on                    control.no_power_on
+    --no-vd-destroy-content          virtual_display.no_vd_destroy_content
+    --no-vd-system-decorations       virtual_display.no_vd_system_decorations
+    --no-video                       video.no_video
+    --no-video-playback              video.no_video_playback
+    --no-window                      window.no_window
+    --orientation=value              video.orientation
+    --otg                            connect.otg
+    -p, --port=port[:port]           connect.port
+    --pause-on-exit[=mode]           general.pause_on_exit
+    --power-off-on-close             control.power_off_on_close
+    --prefer-text                    input.prefer_text
+    --print-fps                      general.print_fps
+    --push-target=path               general.push_target
+    -r, --record=file                record.file
+    --raw-key-events                 input.raw_key_events
+    --record-format=format           record.format (mp4|mkv|m4a|mka|opus|aac|flac|wav)
+    --record-orientation=value       record.orientation
+    --render-driver=name             window.render_driver
+    --render-fit=mode                video.render_fit (letterbox|stretched|unscaled)
+    -s, --serial=serial              connect.serial
+    -S, --turn-screen-off            control.turn_screen_off
+    --screen-off-timeout=seconds     control.screen_off_timeout
+    --shortcut-mod=key[+...][,...]   input.shortcut_mod
+    --start-app=name                 virtual_display.start_app
+    -t, --show-touches               control.show_touches
+    --tcpip[=[+]ip[:port]]           connect.tcpip
+    --time-limit=seconds             record.time_limit / general.time_limit
+    --tunnel-host=ip                 connect.tunnel_host
+    --tunnel-port=port               connect.tunnel_port
+    -V, --verbosity=value            general.verbosity (verbose|debug|info|warn|error)
+    --video-buffer=ms                video.video_buffer
+    --video-codec=name               video.codec (h264|h265|av1)
+    --video-encoder=name             video.encoder
+    --video-source=source            video.source (display|camera)
+    -w, --stay-awake                 control.stay_awake
+    --window-borderless              window.borderless
+    --window-title=text              window.title
+    --window-x=value                 window.x
+    --window-y=value                 window.y
+    --window-width=value             window.width
+    --window-height=value            window.height
+
+Linux-only (not yet modelled; added with the Linux provider):
+    --v4l2-sink=/dev/videoN
+    --v4l2-buffer=ms
+
+Listing commands surfaced via the `scrcpy_list` Tauri command (used to populate dropdowns):
+    --list-cameras, --list-camera-sizes, --list-displays, --list-encoders, --list-apps
