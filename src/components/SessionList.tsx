@@ -6,6 +6,7 @@ import {
   stopSession,
   errMessage,
 } from "../lib/ipc";
+import { openControlWindow } from "../lib/controlWindow";
 import { Button } from "./ui";
 
 export function SessionList() {
@@ -53,9 +54,19 @@ export function SessionList() {
                 <div className="text-xs font-medium text-zinc-200">Session #{s.id}</div>
                 <div className="truncate font-mono text-[10px] text-zinc-500">{s.command}</div>
               </button>
-              <Button variant="danger" onClick={() => stop(s.id)}>
-                Stop
-              </Button>
+              <div className="flex shrink-0 gap-1">
+                <Button
+                  onClick={() =>
+                    openControlWindow(s.serial ?? "").catch((e) => setStatus(errMessage(e)))
+                  }
+                  title="Open device controls for this session"
+                >
+                  Controls
+                </Button>
+                <Button variant="danger" onClick={() => stop(s.id)}>
+                  Stop
+                </Button>
+              </div>
             </div>
             {open === s.id && (
               <pre className="max-h-48 overflow-auto bg-black px-3 py-2 font-mono text-[10px] leading-relaxed text-zinc-400">

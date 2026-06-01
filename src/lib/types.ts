@@ -166,6 +166,7 @@ export interface Binaries {
 export interface SessionInfo {
   id: number;
   command: string;
+  serial?: string;
 }
 
 export interface AppError {

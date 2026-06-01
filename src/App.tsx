@@ -5,6 +5,7 @@ import { ProfileBar } from "./components/ProfileBar";
 import { CommandBar } from "./components/CommandBar";
 import { ShortcutsPanel } from "./components/ShortcutsPanel";
 import { AppsPanel } from "./components/AppsPanel";
+import { MenuBar } from "./components/MenuBar";
 import {
   AudioPanel,
   CameraPanel,
@@ -53,6 +54,7 @@ export default function App() {
       <DeviceDock />
 
       <main className="flex min-w-0 flex-1 flex-col">
+        <MenuBar onSelectTab={setActive} />
         <ProfileBar />
 
         <nav className="flex gap-1 overflow-x-auto border-b border-zinc-800 bg-zinc-950 px-2 py-1.5">

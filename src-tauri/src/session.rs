@@ -20,6 +20,8 @@ const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 pub struct SessionInfo {
     pub id: u32,
     pub command: String,
+    /// Device serial this session targets, if known (used to open device controls for it).
+    pub serial: Option<String>,
 }
 
 #[derive(Clone, Serialize)]
@@ -100,7 +102,13 @@ impl SessionManager {
     }
 
     /// Launch scrcpy with the given argv. `app` is used to emit log/exit events.
-    pub fn launch(&self, app: &AppHandle, bin: &Binaries, argv: Vec<String>) -> Result<SessionInfo> {
+    pub fn launch(
+        &self,
+        app: &AppHandle,
+        bin: &Binaries,
+        argv: Vec<String>,
+        serial: Option<String>,
+    ) -> Result<SessionInfo> {
         let id = self.registry.alloc_id();
         let command_str = {
             let mut parts = vec!["scrcpy".to_string()];
@@ -131,6 +139,7 @@ impl SessionManager {
         let info = SessionInfo {
             id,
             command: command_str,
+            serial,
         };
         let child = Arc::new(Mutex::new(child));
         self.registry.insert(Entry {

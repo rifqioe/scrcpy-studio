@@ -139,14 +139,15 @@ export function ControlOverlay() {
 
   const targetDev = devices.find((d) => d.serial === target);
   const targetName = (targetDev?.model ?? target) || "none";
+  // Centered icon buttons (not full-width) so the surrounding area stays draggable.
   const btn =
-    "flex h-9 w-full items-center justify-center text-zinc-300 hover:bg-zinc-700/70 hover:text-zinc-100";
+    "flex h-8 w-8 items-center justify-center rounded-md text-zinc-300 hover:bg-zinc-700/70 hover:text-zinc-100";
 
   return (
-    // The whole bar is a drag region; buttons still receive clicks, empty gaps drag the window.
+    // The whole bar is a drag region; buttons receive clicks, the surrounding area drags.
     <div
       data-tauri-drag-region
-      className="flex h-screen w-screen flex-col items-center bg-zinc-900 text-zinc-100"
+      className="flex h-screen w-screen flex-col items-center gap-0.5 bg-zinc-900 py-1 text-zinc-100"
     >
       <button onClick={() => getCurrentWindow().close()} className={btn} title="Close">
         <X size={17} />

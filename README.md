@@ -26,8 +26,11 @@ any flag the UI doesn't expose yet.
   by the UI.
 - **App launcher** — list installed apps (`--list-apps`), search, and pick one to launch on
   start (`--start-app`), optionally into a new virtual display.
-- **Floating control toolbar** — send Back / Home / Recents / Menu / Volume / Power /
-  notifications to the device over adb, plus one-tap screenshots — independent of the mirror.
+- **Floating control bar** — a slim, always-on-top window (opened per running session) that
+  sends Back / Home / Recents / Menu / Volume / Power / rotate / notifications and screenshots
+  to the device over adb — independent of the mirror. Long-press for rapid volume, the
+  assistant (hold Home), or the power menu (hold Power).
+- **Menu bar** — quick access to command panels, apps, scrcpy update, and documentation.
 
 ## Tech stack
 

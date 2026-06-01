@@ -109,8 +109,9 @@ pub fn preview_argv(args: ScrcpyArgs) -> Result<String> {
 #[tauri::command]
 pub fn launch(app: AppHandle, state: State<AppState>, args: ScrcpyArgs) -> Result<SessionInfo> {
     let bin = state.binary.require()?;
+    let serial = args.connect.serial.clone();
     let argv = args.to_argv()?;
-    state.sessions.launch(&app, &bin, argv)
+    state.sessions.launch(&app, &bin, argv, serial)
 }
 
 #[tauri::command]
