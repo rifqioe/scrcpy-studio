@@ -55,6 +55,8 @@ export const listApps = (serial: string | undefined, includeSystem: boolean) =>
 export const createShortcut = (args: ScrcpyArgs, pkg: string, label: string) =>
   invoke<string>("create_shortcut", { args, package: pkg, label });
 
+export const iconWeb = (pkg: string) => invoke<string | null>("icon_web", { package: pkg });
+
 // ---- device control ----
 export const deviceAction = (serial: string, action: string) =>
   invoke<void>("device_action", { serial, action });

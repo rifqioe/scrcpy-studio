@@ -2,7 +2,19 @@ import { useEffect, useMemo, useState } from "react";
 import { MoreVertical } from "lucide-react";
 import { useConfig } from "../state/config";
 import { useDevices } from "../state/devices";
-import { listApps, createShortcut, errMessage, type DeviceApp } from "../lib/ipc";
+import { listApps, createShortcut, iconWeb, errMessage, type DeviceApp } from "../lib/ipc";
+
+// Persistent icon-URL cache (package → url, or "" when none found on the web).
+function loadIconCache(): Record<string, string> {
+  try {
+    return JSON.parse(localStorage.getItem("icon.cache") ?? "{}");
+  } catch {
+    return {};
+  }
+}
+function saveIconCache(c: Record<string, string>) {
+  localStorage.setItem("icon.cache", JSON.stringify(c));
+}
 import { Button, PanelTitle, Toggle } from "./ui";
 
 export function AppsPanel() {
@@ -16,6 +28,8 @@ export function AppsPanel() {
   const [working, setWorking] = useState<string>();
   const [menuFor, setMenuFor] = useState<string>();
   const [autoLoad, setAutoLoad] = useState(() => localStorage.getItem("apps.autoLoad") === "1");
+  const [pullIcon, setPullIcon] = useState(() => localStorage.getItem("apps.pullIcon") === "1");
+  const [icons, setIcons] = useState<Record<string, string>>(() => loadIconCache());
 
   // Auto-load the app list when the panel opens (if enabled and a device is selected).
   useEffect(() => {
@@ -29,6 +43,39 @@ export function AppsPanel() {
     setAutoLoad(v);
     localStorage.setItem("apps.autoLoad", v ? "1" : "0");
   }
+  function togglePullIcon(v: boolean) {
+    setPullIcon(v);
+    localStorage.setItem("apps.pullIcon", v ? "1" : "0");
+  }
+
+  // Lazily fetch missing icons from the web (cached). Concurrency-limited.
+  useEffect(() => {
+    if (!pullIcon || apps.length === 0) return;
+    let cancelled = false;
+    const cache = loadIconCache();
+    const todo = apps.filter((a) => cache[a.package] === undefined).map((a) => a.package);
+    if (todo.length === 0) return;
+
+    let idx = 0;
+    async function worker() {
+      while (!cancelled && idx < todo.length) {
+        const pkg = todo[idx++];
+        let url = "";
+        try {
+          url = (await iconWeb(pkg)) ?? "";
+        } catch {
+          url = "";
+        }
+        cache[pkg] = url;
+        saveIconCache(cache);
+        if (!cancelled) setIcons((m) => ({ ...m, [pkg]: url }));
+      }
+    }
+    Promise.all(Array.from({ length: 6 }, worker));
+    return () => {
+      cancelled = true;
+    };
+  }, [pullIcon, apps]);
 
   async function load() {
     setBusy(true);
@@ -78,6 +125,7 @@ export function AppsPanel() {
         </Button>
         <Toggle label="Include system apps" checked={includeSystem} onChange={setIncludeSystem} />
         <Toggle label="Auto load" checked={autoLoad} onChange={toggleAutoLoad} />
+        <Toggle label="Pull Icon (from web)" checked={pullIcon} onChange={togglePullIcon} />
         {!selected && <span className="text-xs text-amber-400">Select a device first.</span>}
       </div>
 
@@ -128,6 +176,13 @@ export function AppsPanel() {
                 : "border-zinc-800 hover:border-zinc-700")
             }
           >
+            {icons[a.package] ? (
+              <img src={icons[a.package]} alt="" className="h-8 w-8 shrink-0 rounded" loading="lazy" />
+            ) : (
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-zinc-800 text-xs text-zinc-500">
+                {a.name.charAt(0).toUpperCase()}
+              </span>
+            )}
             <button
               onClick={() => patch("virtualDisplay", { startApp: a.package })}
               className="min-w-0 flex-1 text-left"

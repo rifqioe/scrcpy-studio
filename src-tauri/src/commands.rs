@@ -170,6 +170,42 @@ pub fn list_apps(
     apps::list(&bin.scrcpy, &bin.adb, serial.as_deref(), include_system)
 }
 
+/// Look up an app's icon URL from its Google Play listing (og:image). Returns None if the
+/// package isn't on Play or has no icon. Network only — installs nothing, pulls no APK.
+#[tauri::command]
+pub fn icon_web(package: String) -> Result<Option<String>> {
+    let url = format!("https://play.google.com/store/apps/details?id={package}&hl=en");
+    let client = reqwest::blocking::Client::builder()
+        .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) scrcpy-studio")
+        .timeout(std::time::Duration::from_secs(10))
+        .build()
+        .map_err(|e| AppError::Download(e.to_string()))?;
+    let resp = client
+        .get(url)
+        .send()
+        .map_err(|e| AppError::Download(e.to_string()))?;
+    if !resp.status().is_success() {
+        return Ok(None);
+    }
+    let body = resp.text().map_err(|e| AppError::Download(e.to_string()))?;
+    Ok(parse_og_image(&body))
+}
+
+/// Extract the `og:image` content URL from an HTML page.
+fn parse_og_image(html: &str) -> Option<String> {
+    let i = html.find("og:image")?;
+    let rest = &html[i..];
+    let c = rest.find("content=\"")?;
+    let start = i + c + "content=\"".len();
+    let end = html[start..].find('"')?;
+    let url = html[start..start + end].to_string();
+    if url.starts_with("http") {
+        Some(url)
+    } else {
+        None
+    }
+}
+
 /// Create a desktop shortcut that launches scrcpy with the given config (optionally starting
 /// `package`). Returns the saved `.lnk` path.
 #[tauri::command]
@@ -226,4 +262,23 @@ pub fn profile_list(state: State<AppState>) -> Result<Vec<String>> {
 #[tauri::command]
 pub fn profile_delete(state: State<AppState>, name: String) -> Result<()> {
     crate::profiles::delete(&state.data_dir, &name)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_og_image;
+
+    #[test]
+    fn extracts_og_image_url() {
+        let html = r#"<meta property="og:image" content="https://play-lh.googleusercontent.com/abc=s512"><x>"#;
+        assert_eq!(
+            parse_og_image(html).as_deref(),
+            Some("https://play-lh.googleusercontent.com/abc=s512")
+        );
+    }
+
+    #[test]
+    fn returns_none_without_og_image() {
+        assert_eq!(parse_og_image("<html>no meta</html>"), None);
+    }
 }

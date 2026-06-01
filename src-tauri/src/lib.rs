@@ -42,6 +42,7 @@ pub fn run() {
             commands::go_wireless,
             commands::qr_pair_start,
             commands::list_apps,
+            commands::icon_web,
             commands::create_shortcut,
             commands::device_action,
             commands::device_screenshot,
