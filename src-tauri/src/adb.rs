@@ -123,6 +123,55 @@ pub fn tcpip(adb: &Path, serial: &str, port: u16) -> Result<String> {
     Ok(run(adb, &["-s", serial, "tcpip", &port])?.trim().to_string())
 }
 
+/// Best-effort discovery of a device's Wi-Fi IPv4 address (queried over the current
+/// connection, typically USB). Tries `ip addr show wlan0`, then the routing table.
+pub fn device_ip(adb: &Path, serial: &str) -> Result<String> {
+    let attempts: [&[&str]; 3] = [
+        &["-s", serial, "shell", "ip", "-o", "-4", "addr", "show", "wlan0"],
+        &["-s", serial, "shell", "ip", "route"],
+        &["-s", serial, "shell", "ip", "-o", "-4", "addr"],
+    ];
+    for args in attempts {
+        if let Ok(out) = run(adb, args) {
+            if let Some(ip) = parse_ipv4(&out) {
+                return Ok(ip);
+            }
+        }
+    }
+    Err(AppError::Adb(
+        "could not determine the device Wi-Fi IP (is Wi-Fi on?)".into(),
+    ))
+}
+
+/// Pull the device's IPv4 out of arbitrary `ip` command output.
+///
+/// Prefers the address that follows an `inet` or `src` marker (the host address), which
+/// avoids picking the network address (e.g. `192.168.1.0`) that precedes `src` in route output.
+fn parse_ipv4(text: &str) -> Option<String> {
+    fn clean(token: &str) -> Option<String> {
+        let token = token.split('/').next().unwrap_or(token);
+        let addr = token.parse::<std::net::Ipv4Addr>().ok()?;
+        let o = addr.octets();
+        let bad = o[0] == 127 || addr.is_unspecified() || (o[0] == 169 && o[1] == 254);
+        if bad {
+            None
+        } else {
+            Some(addr.to_string())
+        }
+    }
+
+    let tokens: Vec<&str> = text.split_whitespace().collect();
+    for (i, t) in tokens.iter().enumerate() {
+        if *t == "inet" || *t == "src" {
+            if let Some(ip) = tokens.get(i + 1).and_then(|n| clean(n)) {
+                return Some(ip);
+            }
+        }
+    }
+    // Fallback: first usable address that isn't a network address (x.x.x.0).
+    tokens.iter().filter_map(|t| clean(t)).find(|ip| !ip.ends_with(".0"))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -153,6 +202,23 @@ mod tests {
             "adb server version (41) doesn't match this client (39); killing..."
         ));
         assert!(!is_version_conflict("error: device offline"));
+    }
+
+    #[test]
+    fn parses_ipv4_from_addr_output() {
+        let out = "32: wlan0    inet 192.168.1.23/24 brd 192.168.1.255 scope global wlan0";
+        assert_eq!(parse_ipv4(out).as_deref(), Some("192.168.1.23"));
+    }
+
+    #[test]
+    fn parses_ipv4_from_route_output() {
+        let out = "192.168.1.0/24 dev wlan0 proto kernel scope link src 192.168.1.42";
+        assert_eq!(parse_ipv4(out).as_deref(), Some("192.168.1.42"));
+    }
+
+    #[test]
+    fn parse_ipv4_skips_loopback_and_link_local() {
+        assert_eq!(parse_ipv4("127.0.0.1 169.254.1.1 10.0.0.5").as_deref(), Some("10.0.0.5"));
     }
 
     #[test]

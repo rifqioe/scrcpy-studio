@@ -68,6 +68,21 @@ pub fn adb_tcpip(state: State<AppState>, serial: String, port: u16) -> Result<St
     adb::tcpip(&bin.adb, &serial, port)
 }
 
+/// One-click USB → Wi-Fi: read the device IP over USB, switch it to TCP/IP on 5555, then
+/// connect over the network so it survives unplugging the cable. Returns the `ip:5555` serial.
+#[tauri::command]
+pub fn go_wireless(state: State<AppState>, serial: String) -> Result<String> {
+    let bin = state.binary.require()?;
+    // Read the IP while USB is still connected.
+    let ip = adb::device_ip(&bin.adb, &serial)?;
+    // Switch the device's adbd into TCP/IP mode (restarts adbd, ~1-2s).
+    adb::tcpip(&bin.adb, &serial, 5555)?;
+    std::thread::sleep(std::time::Duration::from_millis(1500));
+    let addr = format!("{ip}:5555");
+    adb::connect(&bin.adb, &addr)?;
+    Ok(addr)
+}
+
 /// Start a QR wireless-pairing session: returns the QR payload to render and begins
 /// browsing mDNS for the phone. The outcome arrives via the `qr-pair-result` event.
 #[tauri::command]

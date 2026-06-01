@@ -36,6 +36,7 @@ pub fn run() {
             commands::adb_disconnect,
             commands::adb_pair,
             commands::adb_tcpip,
+            commands::go_wireless,
             commands::qr_pair_start,
             commands::preview_argv,
             commands::launch,

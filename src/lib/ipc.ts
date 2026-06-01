@@ -18,6 +18,7 @@ export const adbPair = (addr: string, code: string) =>
   invoke<string>("adb_pair", { addr, code });
 export const adbTcpip = (serial: string, port: number) =>
   invoke<string>("adb_tcpip", { serial, port });
+export const goWireless = (serial: string) => invoke<string>("go_wireless", { serial });
 
 // ---- QR wireless pairing ----
 export interface QrSession {

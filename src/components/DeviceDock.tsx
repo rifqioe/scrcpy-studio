@@ -5,7 +5,7 @@ import { useConfig } from "../state/config";
 import {
   adbConnect,
   adbPair,
-  adbTcpip,
+  goWireless,
   qrPairStart,
   onQrPairResult,
   errMessage,
@@ -44,6 +44,22 @@ export function DeviceDock() {
       un.then((f) => f());
     };
   }, [refresh]);
+
+  async function doGoWireless() {
+    if (!selected) return;
+    setBusy(true);
+    setMsg("Switching to Wi-Fi…");
+    try {
+      const addr = await goWireless(selected);
+      select(addr);
+      setMsg(`Wireless: ${addr}. Cable can be unplugged now.`);
+      await refresh();
+    } catch (e) {
+      setMsg(errMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function startQr() {
     setQrStatus(undefined);
@@ -172,10 +188,10 @@ export function DeviceDock() {
         </div>
         <Button
           disabled={busy || !selected || selected.includes(":")}
-          onClick={() => act(() => adbTcpip(selected!, 5555))}
-          title="Switch the selected USB device to TCP/IP on port 5555"
+          onClick={doGoWireless}
+          title="Read the device IP, switch it to TCP/IP, and connect over Wi-Fi so it survives unplugging the cable"
         >
-          Enable TCP/IP on selected (5555)
+          Go wireless (USB → Wi-Fi)
         </Button>
         {msg && <p className="break-words text-[11px] text-zinc-400">{msg}</p>}
       </section>
