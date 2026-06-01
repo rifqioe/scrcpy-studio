@@ -1,11 +1,15 @@
 import { useEffect, useState } from "react";
+import { QRCodeSVG } from "qrcode.react";
 import { useDevices } from "../state/devices";
 import { useConfig } from "../state/config";
 import {
   adbConnect,
   adbPair,
   adbTcpip,
+  qrPairStart,
+  onQrPairResult,
   errMessage,
+  type QrSession,
 } from "../lib/ipc";
 import { Button } from "./ui";
 import { BinaryManager } from "./BinaryManager";
@@ -18,12 +22,38 @@ export function DeviceDock() {
   const [pairCode, setPairCode] = useState("");
   const [msg, setMsg] = useState<string>();
   const [busy, setBusy] = useState(false);
+  const [qr, setQr] = useState<QrSession | null>(null);
+  const [qrStatus, setQrStatus] = useState<string>();
 
   useEffect(() => {
     refresh();
     const t = setInterval(refresh, 4000);
     return () => clearInterval(t);
   }, [refresh]);
+
+  // Listen for QR pairing results emitted from the Rust mDNS watcher.
+  useEffect(() => {
+    const un = onQrPairResult((e) => {
+      setQrStatus(e.message);
+      if (e.success) {
+        setQr(null);
+        refresh();
+      }
+    });
+    return () => {
+      un.then((f) => f());
+    };
+  }, [refresh]);
+
+  async function startQr() {
+    setQrStatus(undefined);
+    try {
+      setQr(await qrPairStart());
+      setQrStatus("Scan in: Developer options → Wireless debugging → Pair device with QR code.");
+    } catch (e) {
+      setQrStatus(errMessage(e));
+    }
+  }
 
   // Mirror the selected serial into the launch config.
   useEffect(() => {
@@ -97,8 +127,28 @@ export function DeviceDock() {
             Connect
           </Button>
         </div>
+        <div className="flex flex-col gap-2 rounded-md border border-zinc-800 p-2">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] text-zinc-500">Pair via QR (Android 11+)</span>
+            <Button variant="ghost" onClick={startQr} disabled={busy}>
+              {qr ? "New code" : "QR"}
+            </Button>
+          </div>
+          {qr && (
+            <div className="flex flex-col items-center gap-1.5 rounded-md bg-white p-2">
+              <QRCodeSVG value={qr.payload} size={150} />
+            </div>
+          )}
+          {qr && (
+            <div className="text-center text-[11px] text-zinc-400">
+              code <span className="font-mono text-emerald-300">{qr.code}</span>
+            </div>
+          )}
+          {qrStatus && <p className="break-words text-[11px] text-zinc-400">{qrStatus}</p>}
+        </div>
+
         <div className="flex flex-col gap-1.5 rounded-md border border-zinc-800 p-2">
-          <span className="text-[11px] text-zinc-500">Pair (Android 11+)</span>
+          <span className="text-[11px] text-zinc-500">Pair manually (Android 11+)</span>
           <input
             className="rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs text-zinc-100 outline-none focus:border-emerald-500"
             placeholder="ip:port (pairing)"

@@ -4,6 +4,7 @@ mod binary;
 mod commands;
 mod error;
 mod profiles;
+mod qr_pair;
 mod session;
 mod state;
 
@@ -35,6 +36,7 @@ pub fn run() {
             commands::adb_disconnect,
             commands::adb_pair,
             commands::adb_tcpip,
+            commands::qr_pair_start,
             commands::preview_argv,
             commands::launch,
             commands::stop_session,

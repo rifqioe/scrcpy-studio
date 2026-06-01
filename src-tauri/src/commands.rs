@@ -68,6 +68,16 @@ pub fn adb_tcpip(state: State<AppState>, serial: String, port: u16) -> Result<St
     adb::tcpip(&bin.adb, &serial, port)
 }
 
+/// Start a QR wireless-pairing session: returns the QR payload to render and begins
+/// browsing mDNS for the phone. The outcome arrives via the `qr-pair-result` event.
+#[tauri::command]
+pub fn qr_pair_start(app: AppHandle, state: State<AppState>) -> Result<crate::qr_pair::QrSession> {
+    let bin = state.binary.require()?;
+    let session = crate::qr_pair::new_session();
+    crate::qr_pair::start(app, bin.adb.clone(), session.clone())?;
+    Ok(session)
+}
+
 // ---- scrcpy launch / sessions ----
 
 #[tauri::command]

@@ -19,6 +19,20 @@ export const adbPair = (addr: string, code: string) =>
 export const adbTcpip = (serial: string, port: number) =>
   invoke<string>("adb_tcpip", { serial, port });
 
+// ---- QR wireless pairing ----
+export interface QrSession {
+  payload: string;
+  name: string;
+  code: string;
+}
+export interface QrPairResult {
+  success: boolean;
+  message: string;
+}
+export const qrPairStart = () => invoke<QrSession>("qr_pair_start");
+export const onQrPairResult = (cb: (e: QrPairResult) => void): Promise<UnlistenFn> =>
+  listen<QrPairResult>("qr-pair-result", (event) => cb(event.payload));
+
 // ---- scrcpy launch / sessions ----
 export const previewArgv = (args: ScrcpyArgs) => invoke<string>("preview_argv", { args });
 export const launch = (args: ScrcpyArgs) => invoke<SessionInfo>("launch", { args });
