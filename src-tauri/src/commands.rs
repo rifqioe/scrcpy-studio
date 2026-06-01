@@ -224,15 +224,55 @@ pub fn create_shortcut(
     args: ScrcpyArgs,
     package: Option<String>,
     label: String,
+    icon_url: Option<String>,
 ) -> Result<String> {
     let bin = state.binary.require()?;
     let mut args = args;
-    if let Some(pkg) = package {
-        args.virtual_display.start_app = Some(pkg);
+    if let Some(pkg) = &package {
+        args.virtual_display.start_app = Some(pkg.clone());
     }
     let argv = args.to_argv()?;
-    let path = crate::shortcut::create(&bin.scrcpy, &argv, &label)?;
+
+    // Build a .ico from the app's web icon so the shortcut shows the app, not scrcpy.
+    let icon = match (&package, &icon_url) {
+        (Some(pkg), Some(url)) if url.starts_with("http") => {
+            make_ico(&state.data_dir, pkg, url).ok()
+        }
+        _ => None,
+    };
+
+    let path = crate::shortcut::create(&bin.scrcpy, &argv, &label, icon.as_deref())?;
     Ok(path.to_string_lossy().to_string())
+}
+
+#[cfg(windows)]
+fn make_ico(data_dir: &std::path::Path, pkg: &str, url: &str) -> Result<std::path::PathBuf> {
+    let dir = data_dir.join("shortcut-icons");
+    std::fs::create_dir_all(&dir)?;
+    let safe: String = pkg.chars().map(|c| if c.is_alphanumeric() { c } else { '_' }).collect();
+    let path = dir.join(format!("{safe}.ico"));
+
+    let bytes = reqwest::blocking::Client::builder()
+        .user_agent("scrcpy-studio")
+        .timeout(std::time::Duration::from_secs(10))
+        .build()
+        .map_err(|e| AppError::Download(e.to_string()))?
+        .get(url)
+        .send()
+        .and_then(|r| r.bytes())
+        .map_err(|e| AppError::Download(e.to_string()))?;
+
+    let img = image::load_from_memory(&bytes).map_err(|e| AppError::Io(e.to_string()))?;
+    let mut out = std::io::Cursor::new(Vec::new());
+    img.write_to(&mut out, image::ImageFormat::Ico)
+        .map_err(|e| AppError::Io(e.to_string()))?;
+    std::fs::write(&path, out.into_inner())?;
+    Ok(path)
+}
+
+#[cfg(not(windows))]
+fn make_ico(_data_dir: &std::path::Path, _pkg: &str, _url: &str) -> Result<std::path::PathBuf> {
+    Err(AppError::InvalidArgs("icons only on windows".into()))
 }
 
 // ---- device control (floating toolbar) ----
