@@ -24,6 +24,10 @@ any flag the UI doesn't expose yet.
 - **Profiles** — save and reload named configurations.
 - **Raw args passthrough** — append any flags verbatim, so a newer scrcpy is never blocked
   by the UI.
+- **App launcher** — list installed apps (`--list-apps`), search, and pick one to launch on
+  start (`--start-app`), optionally into a new virtual display.
+- **Floating control toolbar** — send Back / Home / Recents / Menu / Volume / Power /
+  notifications to the device over adb, plus one-tap screenshots — independent of the mirror.
 
 ## Tech stack
 
