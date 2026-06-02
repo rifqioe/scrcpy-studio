@@ -51,6 +51,11 @@ export function MenuBar({
           }
         >
           {p.label}
+          {p.id === "control" && (
+            <sup className="ml-1 rounded bg-amber-500/20 px-1 text-[9px] font-semibold text-amber-400">
+              beta
+            </sup>
+          )}
         </button>
       ))}
 
