@@ -11,6 +11,7 @@ import {
   ChevronDown,
   ChevronUp,
   Circle,
+  ArrowUpToLine,
   Clipboard,
   Copy,
   GripHorizontal,
@@ -27,7 +28,14 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
-import { deviceAction, deviceScreenshot, listDevices, scrcpyWindowRect, fitWindow } from "../lib/ipc";
+import {
+  deviceAction,
+  deviceScreenshot,
+  listDevices,
+  scrcpyWindowRect,
+  fitWindow,
+  rotateScrcpy,
+} from "../lib/ipc";
 import type { Device } from "../lib/types";
 
 interface Btn {
@@ -72,7 +80,18 @@ export function ControlOverlay() {
   const [target, setTarget] = useState(initial);
   const [attached, setAttached] = useState(true);
   const [collapsed, setCollapsed] = useState(false);
+  const [onTop, setOnTop] = useState(true);
   const fullHeightRef = useRef(0);
+
+  async function toggleOnTop() {
+    const next = !onTop;
+    setOnTop(next);
+    try {
+      await getCurrentWindow().setAlwaysOnTop(next);
+    } catch {
+      /* ignore */
+    }
+  }
   const holdTimer = useRef<number | null>(null);
   const repeatTimer = useRef<number | null>(null);
   const heldRef = useRef(false);
@@ -142,6 +161,15 @@ export function ControlOverlay() {
   }, [attached, scrcpyTitle]);
 
   async function send(action: string) {
+    // Rotate is done through scrcpy's own shortcut so it works on virtual displays too.
+    if (action === "rotate") {
+      try {
+        await rotateScrcpy(scrcpyTitle || undefined);
+      } catch {
+        /* ignore */
+      }
+      return;
+    }
     const serial = targetRef.current;
     if (!serial) return;
     try {
@@ -240,6 +268,13 @@ export function ControlOverlay() {
         title={attached ? "Docked to scrcpy — click to detach" : "Detached — click to dock"}
       >
         {attached ? <Pin size={17} /> : <PinOff size={17} />}
+      </button>
+      <button
+        onClick={toggleOnTop}
+        className={btn + (onTop ? " text-emerald-400" : "")}
+        title={onTop ? "Always on top — click to disable" : "Not always on top — click to enable"}
+      >
+        <ArrowUpToLine size={17} />
       </button>
       <div className="my-1 h-px w-6 bg-zinc-700" />
 

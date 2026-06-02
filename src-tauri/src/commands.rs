@@ -330,55 +330,106 @@ pub struct WinRect {
     pub h: i32,
 }
 
+#[cfg(windows)]
+fn wide(s: &str) -> Vec<u16> {
+    s.encode_utf16().chain(std::iter::once(0)).collect()
+}
+
+/// Find the scrcpy mirror window by title, falling back to the SDL window class.
+#[cfg(windows)]
+fn find_scrcpy_hwnd(title: Option<&str>) -> Option<windows::Win32::Foundation::HWND> {
+    use windows::core::PCWSTR;
+    use windows::Win32::UI::WindowsAndMessaging::FindWindowW;
+    unsafe {
+        let by_title = match title {
+            Some(t) if !t.is_empty() => {
+                let w = wide(t);
+                FindWindowW(PCWSTR::null(), PCWSTR(w.as_ptr())).ok()
+            }
+            _ => None,
+        }
+        .filter(|h| !h.0.is_null());
+        by_title.or_else(|| {
+            let cls = wide("SDL_app");
+            FindWindowW(PCWSTR(cls.as_ptr()), PCWSTR::null())
+                .ok()
+                .filter(|h| !h.0.is_null())
+        })
+    }
+}
+
 /// Locate the scrcpy mirror window and return its screen rectangle, for docking the control
-/// bar beside it. Matches by exact window title; falls back to the SDL window class.
+/// bar beside it.
 #[tauri::command]
 pub fn scrcpy_window_rect(title: Option<String>) -> Option<WinRect> {
     #[cfg(windows)]
     {
-        use windows::core::PCWSTR;
         use windows::Win32::Foundation::RECT;
-        use windows::Win32::UI::WindowsAndMessaging::{FindWindowW, GetWindowRect};
-
-        fn wide(s: &str) -> Vec<u16> {
-            s.encode_utf16().chain(std::iter::once(0)).collect()
+        use windows::Win32::UI::WindowsAndMessaging::GetWindowRect;
+        let hwnd = find_scrcpy_hwnd(title.as_deref())?;
+        let mut r = RECT::default();
+        if unsafe { GetWindowRect(hwnd, &mut r) }.is_ok() {
+            return Some(WinRect {
+                x: r.left,
+                y: r.top,
+                w: r.right - r.left,
+                h: r.bottom - r.top,
+            });
         }
-
-        unsafe {
-            let hwnd = match &title {
-                Some(t) if !t.is_empty() => {
-                    let w = wide(t);
-                    FindWindowW(PCWSTR::null(), PCWSTR(w.as_ptr())).ok()
-                }
-                _ => None,
-            }
-            .filter(|h| !h.0.is_null());
-
-            // Fallback: any scrcpy SDL window.
-            let hwnd = hwnd.or_else(|| {
-                let cls = wide("SDL_app");
-                FindWindowW(PCWSTR(cls.as_ptr()), PCWSTR::null())
-                    .ok()
-                    .filter(|h| !h.0.is_null())
-            })?;
-
-            let mut r = RECT::default();
-            if GetWindowRect(hwnd, &mut r).is_ok() {
-                return Some(WinRect {
-                    x: r.left,
-                    y: r.top,
-                    w: r.right - r.left,
-                    h: r.bottom - r.top,
-                });
-            }
-            None
-        }
+        None
     }
     #[cfg(not(windows))]
     {
         let _ = title;
         None
     }
+}
+
+/// Rotate the scrcpy view by simulating its MOD+r shortcut into the scrcpy window. This is the
+/// reliable way to rotate a virtual display (adb user-rotation doesn't affect it).
+#[tauri::command]
+pub fn rotate_scrcpy(title: Option<String>) -> Result<()> {
+    #[cfg(windows)]
+    {
+        use windows::Win32::UI::Input::KeyboardAndMouse::{
+            SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYBD_EVENT_FLAGS,
+            KEYEVENTF_KEYUP, VIRTUAL_KEY, VK_MENU,
+        };
+        use windows::Win32::UI::WindowsAndMessaging::SetForegroundWindow;
+
+        let hwnd = find_scrcpy_hwnd(title.as_deref())
+            .ok_or_else(|| AppError::NotFound("scrcpy window".into()))?;
+        let key_r = VIRTUAL_KEY(0x52); // 'R'
+
+        let mk = |vk: VIRTUAL_KEY, up: bool| INPUT {
+            r#type: INPUT_KEYBOARD,
+            Anonymous: INPUT_0 {
+                ki: KEYBDINPUT {
+                    wVk: vk,
+                    wScan: 0,
+                    dwFlags: if up { KEYEVENTF_KEYUP } else { KEYBD_EVENT_FLAGS(0) },
+                    time: 0,
+                    dwExtraInfo: 0,
+                },
+            },
+        };
+        // MOD+r — default scrcpy modifier is (left) Alt.
+        let inputs = [
+            mk(VK_MENU, false),
+            mk(key_r, false),
+            mk(key_r, true),
+            mk(VK_MENU, true),
+        ];
+        unsafe {
+            let _ = SetForegroundWindow(hwnd);
+            SendInput(&inputs, std::mem::size_of::<INPUT>() as i32);
+        }
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = title;
+    }
+    Ok(())
 }
 
 /// Force the calling window to an exact physical size via Win32, bypassing the WebView2

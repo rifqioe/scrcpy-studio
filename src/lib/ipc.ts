@@ -83,6 +83,8 @@ export const scrcpyWindowRect = (title?: string) =>
 export const fitWindow = (width: number, height: number) =>
   invoke<void>("fit_window", { width, height });
 
+export const rotateScrcpy = (title?: string) => invoke<void>("rotate_scrcpy", { title });
+
 // ---- profiles ----
 export const profileSave = (name: string, args: ScrcpyArgs) =>
   invoke<void>("profile_save", { name, args });
