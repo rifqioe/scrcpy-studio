@@ -321,6 +321,66 @@ fn make_ico(_data_dir: &std::path::Path, _pkg: &str, _url: &str) -> Result<std::
     Err(AppError::InvalidArgs("icons only on windows".into()))
 }
 
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WinRect {
+    pub x: i32,
+    pub y: i32,
+    pub w: i32,
+    pub h: i32,
+}
+
+/// Locate the scrcpy mirror window and return its screen rectangle, for docking the control
+/// bar beside it. Matches by exact window title; falls back to the SDL window class.
+#[tauri::command]
+pub fn scrcpy_window_rect(title: Option<String>) -> Option<WinRect> {
+    #[cfg(windows)]
+    {
+        use windows::core::PCWSTR;
+        use windows::Win32::Foundation::RECT;
+        use windows::Win32::UI::WindowsAndMessaging::{FindWindowW, GetWindowRect};
+
+        fn wide(s: &str) -> Vec<u16> {
+            s.encode_utf16().chain(std::iter::once(0)).collect()
+        }
+
+        unsafe {
+            let hwnd = match &title {
+                Some(t) if !t.is_empty() => {
+                    let w = wide(t);
+                    FindWindowW(PCWSTR::null(), PCWSTR(w.as_ptr())).ok()
+                }
+                _ => None,
+            }
+            .filter(|h| !h.0.is_null());
+
+            // Fallback: any scrcpy SDL window.
+            let hwnd = hwnd.or_else(|| {
+                let cls = wide("SDL_app");
+                FindWindowW(PCWSTR(cls.as_ptr()), PCWSTR::null())
+                    .ok()
+                    .filter(|h| !h.0.is_null())
+            })?;
+
+            let mut r = RECT::default();
+            if GetWindowRect(hwnd, &mut r).is_ok() {
+                return Some(WinRect {
+                    x: r.left,
+                    y: r.top,
+                    w: r.right - r.left,
+                    h: r.bottom - r.top,
+                });
+            }
+            None
+        }
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = title;
+        None
+    }
+}
+
 // ---- device control (floating toolbar) ----
 
 #[tauri::command]

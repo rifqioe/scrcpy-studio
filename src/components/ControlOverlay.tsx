@@ -2,7 +2,7 @@
 // top of the scrcpy mirror. Its own webview, so it reads the initial target serial from the
 // window URL and can switch among connected devices itself.
 import { useEffect, useRef, useState } from "react";
-import { getCurrentWindow } from "@tauri-apps/api/window";
+import { getCurrentWindow, PhysicalPosition } from "@tauri-apps/api/window";
 import {
   Bell,
   Camera,
@@ -12,6 +12,8 @@ import {
   Copy,
   GripHorizontal,
   Menu as MenuIcon,
+  Pin,
+  PinOff,
   Power,
   RotateCw,
   Smartphone,
@@ -22,7 +24,7 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
-import { deviceAction, deviceScreenshot, listDevices, errMessage } from "../lib/ipc";
+import { deviceAction, deviceScreenshot, listDevices, scrcpyWindowRect, errMessage } from "../lib/ipc";
 import type { Device } from "../lib/types";
 
 interface Btn {
@@ -51,10 +53,13 @@ const BUTTONS: Btn[] = [
 ];
 
 export function ControlOverlay() {
-  const initial = new URLSearchParams(window.location.search).get("serial") ?? "";
+  const params = new URLSearchParams(window.location.search);
+  const initial = params.get("serial") ?? "";
+  const scrcpyTitle = params.get("title") ?? "";
   const [devices, setDevices] = useState<Device[]>([]);
   const [target, setTarget] = useState(initial);
   const [status, setStatus] = useState<string>();
+  const [attached, setAttached] = useState(true);
   const holdTimer = useRef<number | null>(null);
   const repeatTimer = useRef<number | null>(null);
   const heldRef = useRef(false);
@@ -69,6 +74,33 @@ export function ControlOverlay() {
       })
       .catch(() => undefined);
   }, [initial]);
+
+  // Dock to the scrcpy window: poll its rect and stick this bar to its left edge.
+  useEffect(() => {
+    if (!attached) return;
+    let cancelled = false;
+    let timer: number | undefined;
+    async function tick() {
+      if (cancelled) return;
+      try {
+        const r = await scrcpyWindowRect(scrcpyTitle || undefined);
+        if (r) {
+          const size = await getCurrentWindow().outerSize();
+          let x = r.x - size.width;
+          if (x < 0) x = r.x + r.w; // not enough room on the left → dock right
+          await getCurrentWindow().setPosition(new PhysicalPosition(x, r.y));
+        }
+      } catch {
+        /* scrcpy window not found yet */
+      }
+      timer = window.setTimeout(tick, 300);
+    }
+    tick();
+    return () => {
+      cancelled = true;
+      if (timer) window.clearTimeout(timer);
+    };
+  }, [attached, scrcpyTitle]);
 
   async function send(action: string) {
     const serial = targetRef.current;
@@ -154,6 +186,13 @@ export function ControlOverlay() {
       </button>
       <button onClick={cycleDevice} className={btn} title={`Target: ${targetName} (${target || "?"})${devices.length > 1 ? " — click to switch" : ""}`}>
         <Smartphone size={17} />
+      </button>
+      <button
+        onClick={() => setAttached((a) => !a)}
+        className={btn + (attached ? " text-emerald-400" : "")}
+        title={attached ? "Docked to scrcpy — click to detach" : "Detached — click to dock"}
+      >
+        {attached ? <Pin size={17} /> : <PinOff size={17} />}
       </button>
       <div className="my-1 h-px w-6 bg-zinc-700" />
 

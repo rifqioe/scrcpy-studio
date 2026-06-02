@@ -71,6 +71,15 @@ export const deviceAction = (serial: string, action: string) =>
 export const deviceScreenshot = (serial: string, stamp: number) =>
   invoke<string>("device_screenshot", { serial, stamp: String(stamp) });
 
+export interface WinRect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+export const scrcpyWindowRect = (title?: string) =>
+  invoke<WinRect | null>("scrcpy_window_rect", { title });
+
 // ---- profiles ----
 export const profileSave = (name: string, args: ScrcpyArgs) =>
   invoke<void>("profile_save", { name, args });

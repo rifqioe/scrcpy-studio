@@ -51,6 +51,12 @@ fn parse_serial(argv: &[String]) -> Option<String> {
 /// floating control window for the target device. Closing the control window exits.
 pub fn run_launch(scrcpy_argv: Vec<String>) {
     let serial = parse_serial(&scrcpy_argv).unwrap_or_default();
+    // Give scrcpy a known window title so the control bar can dock to it.
+    let win_title = format!("scrcpy-studio:{serial}");
+    let mut scrcpy_argv = scrcpy_argv;
+    if !scrcpy_argv.iter().any(|a| a.starts_with("--window-title")) {
+        scrcpy_argv.push(format!("--window-title={win_title}"));
+    }
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
@@ -71,7 +77,7 @@ pub fn run_launch(scrcpy_argv: Vec<String>) {
                 "control-{}",
                 serial.chars().map(|c| if c.is_alphanumeric() { c } else { '_' }).collect::<String>()
             );
-            let url = format!("index.html?serial={serial}");
+            let url = format!("index.html?serial={serial}&title={win_title}");
             WebviewWindowBuilder::new(app, label, WebviewUrl::App(url.into()))
                 .title("Controls")
                 .inner_size(44.0, 600.0)
@@ -92,6 +98,7 @@ pub fn run_launch(scrcpy_argv: Vec<String>) {
             commands::list_devices,
             commands::device_action,
             commands::device_screenshot,
+            commands::scrcpy_window_rect,
         ])
         .run(tauri::generate_context!())
         .expect("error while running launch instance");
@@ -133,6 +140,7 @@ pub fn run() {
             commands::create_shortcut,
             commands::device_action,
             commands::device_screenshot,
+            commands::scrcpy_window_rect,
             commands::preview_argv,
             commands::launch,
             commands::stop_session,
