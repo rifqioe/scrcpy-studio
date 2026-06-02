@@ -8,6 +8,8 @@ import {
   Bell,
   Camera,
   ChevronLeft,
+  ChevronDown,
+  ChevronUp,
   Circle,
   Clipboard,
   Copy,
@@ -69,6 +71,8 @@ export function ControlOverlay() {
   const [devices, setDevices] = useState<Device[]>([]);
   const [target, setTarget] = useState(initial);
   const [attached, setAttached] = useState(true);
+  const [collapsed, setCollapsed] = useState(false);
+  const fullHeightRef = useRef(0);
   const holdTimer = useRef<number | null>(null);
   const repeatTimer = useRef<number | null>(null);
   const heldRef = useRef(false);
@@ -90,6 +94,7 @@ export function ControlOverlay() {
       try {
         const dpr = window.devicePixelRatio || 1;
         const size = await getCurrentWindow().outerSize();
+        fullHeightRef.current = size.height;
         await fitWindow(Math.round(48 * dpr), size.height);
       } catch {
         /* ignore */
@@ -200,6 +205,18 @@ export function ControlOverlay() {
     setTarget(devices[(i + 1) % devices.length].serial);
   }
 
+  async function toggleCollapse() {
+    const dpr = window.devicePixelRatio || 1;
+    const next = !collapsed;
+    setCollapsed(next);
+    const h = next ? Math.round(176 * dpr) : fullHeightRef.current || Math.round(600 * dpr);
+    try {
+      await fitWindow(Math.round(48 * dpr), h);
+    } catch {
+      /* ignore */
+    }
+  }
+
   const targetDev = devices.find((d) => d.serial === target);
   const targetName = (targetDev?.model ?? target) || "none";
   const btn =
@@ -226,8 +243,9 @@ export function ControlOverlay() {
       </button>
       <div className="my-1 h-px w-6 bg-zinc-700" />
 
-      {LAYOUT.map((tok, i) => {
-        if (tok === "sep") return <div key={`sep${i}`} className="my-1 h-px w-6 bg-zinc-700" />;
+      {!collapsed &&
+        LAYOUT.map((tok, i) => {
+          if (tok === "sep") return <div key={`sep${i}`} className="my-1 h-px w-6 bg-zinc-700" />;
         if (tok === "screenshot")
           return (
             <button key="screenshot" onClick={shot} className={btn} title="Screenshot">
@@ -244,6 +262,9 @@ export function ControlOverlay() {
       })}
 
       <div className="mt-auto w-full">
+        <button onClick={toggleCollapse} className={btn} title={collapsed ? "Expand" : "Collapse"}>
+          {collapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
+        </button>
         <div data-tauri-drag-region title="Drag" className="flex h-6 w-full cursor-move items-center justify-center text-zinc-600">
           <GripHorizontal size={15} />
         </div>
