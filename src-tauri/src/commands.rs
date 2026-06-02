@@ -230,6 +230,14 @@ fn parse_og_image(html: &str) -> Option<String> {
 
 /// Create a desktop shortcut that launches scrcpy with the given config (optionally starting
 /// `package`). Returns the saved `.lnk` path.
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ShortcutResult {
+    pub path: String,
+    pub icon_applied: bool,
+    pub warning: Option<String>,
+}
+
 #[tauri::command]
 pub fn create_shortcut(
     state: State<AppState>,
@@ -237,7 +245,7 @@ pub fn create_shortcut(
     package: Option<String>,
     label: String,
     icon_url: Option<String>,
-) -> Result<String> {
+) -> Result<ShortcutResult> {
     let _bin = state.binary.require()?; // ensure scrcpy is installed before making a shortcut
     let mut args = args;
     if let Some(pkg) = &package {
@@ -248,11 +256,19 @@ pub fn create_shortcut(
     let argv = args.to_argv()?;
 
     // Build a .ico from the app's web icon so the shortcut shows the app, not scrcpy.
+    let mut warning = None;
     let icon = match (&package, &icon_url) {
-        (Some(pkg), Some(url)) if url.starts_with("http") => {
-            make_ico(&state.data_dir, pkg, url).ok()
+        (Some(pkg), Some(url)) if url.starts_with("http") => match make_ico(&state.data_dir, pkg, url) {
+            Ok(p) => Some(p),
+            Err(e) => {
+                warning = Some(format!("icon: {e}"));
+                None
+            }
+        },
+        _ => {
+            warning = Some("no web icon for this app".into());
+            None
         }
-        _ => None,
     };
 
     // Target our own exe in --launch mode so scrcpy starts silently (no console window).
@@ -261,7 +277,11 @@ pub fn create_shortcut(
     launch_args.extend(argv);
 
     let path = crate::shortcut::create(&exe, &launch_args, &label, icon.as_deref())?;
-    Ok(path.to_string_lossy().to_string())
+    Ok(ShortcutResult {
+        path: path.to_string_lossy().to_string(),
+        icon_applied: icon.is_some(),
+        warning,
+    })
 }
 
 #[cfg(windows)]
@@ -281,10 +301,17 @@ fn make_ico(data_dir: &std::path::Path, pkg: &str, url: &str) -> Result<std::pat
         .and_then(|r| r.bytes())
         .map_err(|e| AppError::Download(e.to_string()))?;
 
-    let img = image::load_from_memory(&bytes).map_err(|e| AppError::Io(e.to_string()))?;
+    let img = image::load_from_memory(&bytes).map_err(|e| AppError::Io(format!("decode: {e}")))?;
+    // Windows icons cap at 256px; downscale if needed.
+    let img = if img.width() > 256 || img.height() > 256 {
+        img.thumbnail(256, 256)
+    } else {
+        img
+    };
+    let rgba = image::DynamicImage::ImageRgba8(img.to_rgba8());
     let mut out = std::io::Cursor::new(Vec::new());
-    img.write_to(&mut out, image::ImageFormat::Ico)
-        .map_err(|e| AppError::Io(e.to_string()))?;
+    rgba.write_to(&mut out, image::ImageFormat::Ico)
+        .map_err(|e| AppError::Io(format!("encode: {e}")))?;
     std::fs::write(&path, out.into_inner())?;
     Ok(path)
 }

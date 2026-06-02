@@ -28,6 +28,18 @@ pub fn headless_launch(scrcpy_argv: &[String]) {
     let Ok(bin) = mgr.require() else {
         return;
     };
+    // Pre-start the adb server quietly so scrcpy doesn't spawn extra adb console windows.
+    {
+        let mut s = std::process::Command::new(&bin.adb);
+        s.arg("start-server");
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt;
+            s.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
+        }
+        let _ = s.output();
+    }
+
     let mut cmd = std::process::Command::new(&bin.scrcpy);
     cmd.args(scrcpy_argv).env("ADB", &bin.adb);
     if let Some(dir) = bin.scrcpy.parent() {

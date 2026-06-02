@@ -33,23 +33,20 @@ pub fn pull(adb_path: &Path, serial: &str, pkg: &str, dest: &Path) -> Result<Vec
         return Err(AppError::NotFound(format!("APK path for {pkg}")));
     }
 
-    let mut files = Vec::new();
-    for (i, remote) in remotes.iter().enumerate() {
-        let stem = remote.rsplit('/').next().unwrap_or("base.apk");
-        let local = if i == 0 {
-            dest.join(format!("{pkg}.apk"))
-        } else {
-            dest.join(format!("{pkg}-{stem}"))
-        };
-        let status = adb(adb_path, serial, &["pull", remote, &local.to_string_lossy()])
-            .output()
-            .map_err(|e| AppError::Adb(format!("adb pull: {e}")))?;
-        if !status.status.success() {
-            return Err(AppError::Adb(
-                String::from_utf8_lossy(&status.stderr).trim().to_string(),
-            ));
-        }
-        files.push(local.to_string_lossy().to_string());
+    // Pull only the base APK (split configs are device-specific and rarely wanted).
+    let base = remotes
+        .iter()
+        .find(|r| r.contains("base.apk"))
+        .copied()
+        .unwrap_or(remotes[0]);
+    let local = dest.join(format!("{pkg}.apk"));
+    let status = adb(adb_path, serial, &["pull", base, &local.to_string_lossy()])
+        .output()
+        .map_err(|e| AppError::Adb(format!("adb pull: {e}")))?;
+    if !status.status.success() {
+        return Err(AppError::Adb(
+            String::from_utf8_lossy(&status.stderr).trim().to_string(),
+        ));
     }
-    Ok(files)
+    Ok(vec![local.to_string_lossy().to_string()])
 }

@@ -155,8 +155,11 @@ export function AppsPanel() {
     setError(undefined);
     try {
       // Build a shortcut from the current config, launching this app.
-      const path = await createShortcut(args, app.package, `${app.name} (scrcpy)`, icons[app.package] || undefined);
-      setError(`Shortcut created: ${path}`);
+      const res = await createShortcut(args, app.package, `${app.name} (scrcpy)`, icons[app.package] || undefined);
+      setError(
+        `Shortcut created: ${res.path}` +
+          (res.iconApplied ? "" : ` (app icon not used — ${res.warning ?? "no icon"})`),
+      );
     } catch (e) {
       setError(errMessage(e));
     } finally {
