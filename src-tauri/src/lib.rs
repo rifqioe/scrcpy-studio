@@ -80,7 +80,7 @@ pub fn run_launch(scrcpy_argv: Vec<String>) {
             let url = format!("index.html?serial={serial}&title={win_title}");
             WebviewWindowBuilder::new(app, label, WebviewUrl::App(url.into()))
                 .title("Controls")
-                .inner_size(44.0, 600.0)
+                .inner_size(40.0, 600.0)
                 .resizable(false)
                 .decorations(false)
                 .always_on_top(true)

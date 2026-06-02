@@ -171,9 +171,8 @@ export function ControlOverlay() {
 
   const targetDev = devices.find((d) => d.serial === target);
   const targetName = (targetDev?.model ?? target) || "none";
-  // Centered icon buttons (not full-width) so the surrounding area stays draggable.
   const btn =
-    "flex h-8 w-8 items-center justify-center rounded-md text-zinc-300 hover:bg-zinc-700/70 hover:text-zinc-100";
+    "flex h-8 w-full items-center justify-center text-zinc-300 hover:bg-zinc-700/70 hover:text-zinc-100";
 
   return (
     // The whole bar is a drag region; buttons receive clicks, the surrounding area drags.

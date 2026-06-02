@@ -18,10 +18,10 @@ export async function openControlWindow(serial: string, title?: string): Promise
   const win = new WebviewWindow(label, {
     url: `index.html?${q}`,
     title: "Controls",
-    width: 44,
+    width: 40,
     height: 600,
-    minWidth: 44,
-    maxWidth: 44,
+    minWidth: 40,
+    maxWidth: 40,
     resizable: false,
     decorations: false,
     alwaysOnTop: true,
