@@ -52,6 +52,15 @@ const BUTTONS: Btn[] = [
   { action: "rotate", label: "Rotate screen", Icon: RotateCw },
 ];
 
+// Bar layout: action names, "screenshot", or "sep" (divider).
+const LAYOUT: string[] = [
+  "notifications", "copy", "paste", "menu", "sep",
+  "volume_up", "volume_down", "mute", "sep",
+  "power", "sep",
+  "rotate", "screenshot", "sep",
+  "back", "home", "recents", "sep",
+];
+
 export function ControlOverlay() {
   const params = new URLSearchParams(window.location.search);
   const initial = params.get("serial") ?? "";
@@ -195,15 +204,22 @@ export function ControlOverlay() {
       </button>
       <div className="my-1 h-px w-6 bg-zinc-700" />
 
-      {BUTTONS.map((b) => (
-        <button key={b.action} className={btn} title={b.label} {...handlers(b)}>
-          <b.Icon size={17} />
-        </button>
-      ))}
-
-      <button onClick={shot} className={btn} title="Screenshot">
-        <Camera size={17} />
-      </button>
+      {LAYOUT.map((tok, i) => {
+        if (tok === "sep") return <div key={`sep${i}`} className="my-1 h-px w-6 bg-zinc-700" />;
+        if (tok === "screenshot")
+          return (
+            <button key="screenshot" onClick={shot} className={btn} title="Screenshot">
+              <Camera size={17} />
+            </button>
+          );
+        const b = BUTTONS.find((x) => x.action === tok);
+        if (!b) return null;
+        return (
+          <button key={b.action} className={btn} title={b.label} {...handlers(b)}>
+            <b.Icon size={17} />
+          </button>
+        );
+      })}
 
       <div className="mt-auto flex w-full flex-col items-center">
         {status && (
