@@ -52,15 +52,59 @@ fn keycode(action: &str) -> Option<&'static str> {
     })
 }
 
-/// Cycle the device's forced display rotation (0→1→2→3), disabling auto-rotate first.
-fn rotate(adb: &Path, serial: &str) -> Result<()> {
-    let out = adb_args(adb, serial, &["shell", "settings", "get", "system", "user_rotation"])
+/// Per-(device,display) rotation counter, so we can cycle without reading each display's state.
+fn rot_state() -> &'static std::sync::Mutex<std::collections::HashMap<String, u8>> {
+    static S: std::sync::OnceLock<std::sync::Mutex<std::collections::HashMap<String, u8>>> =
+        std::sync::OnceLock::new();
+    S.get_or_init(|| std::sync::Mutex::new(std::collections::HashMap::new()))
+}
+
+/// Collect display ids from `dumpsys display`. The highest id is the most recently added
+/// display — i.e. scrcpy's virtual display when `--new-display` is in use.
+fn display_ids(adb: &Path, serial: &str) -> Vec<i32> {
+    let out = adb_args(adb, serial, &["shell", "dumpsys", "display"])
         .output()
-        .map_err(|e| AppError::Adb(format!("read rotation: {e}")))?;
-    let cur: i32 = String::from_utf8_lossy(&out.stdout).trim().parse().unwrap_or(0);
-    let next = ((cur + 1) % 4).to_string();
-    run(adb, serial, &["shell", "settings", "put", "system", "accelerometer_rotation", "0"])?;
-    run(adb, serial, &["shell", "settings", "put", "system", "user_rotation", &next])
+        .map(|o| String::from_utf8_lossy(&o.stdout).into_owned())
+        .unwrap_or_default();
+    let mut ids = Vec::new();
+    for marker in ["mDisplayId=", "displayId=", "Display id "] {
+        let mut rest = out.as_str();
+        while let Some(p) = rest.find(marker) {
+            rest = &rest[p + marker.len()..];
+            let num: String = rest.chars().take_while(|c| c.is_ascii_digit()).collect();
+            if let Ok(n) = num.parse::<i32>() {
+                ids.push(n);
+            }
+        }
+    }
+    ids.sort_unstable();
+    ids.dedup();
+    ids
+}
+
+/// Cycle the rotation of the active display (the virtual display when present, else the main
+/// one). Best-effort: virtual-display rotation depends on the Android version.
+fn rotate(adb: &Path, serial: &str) -> Result<()> {
+    let ids = display_ids(adb, serial);
+    let target = ids.iter().copied().max().unwrap_or(0);
+
+    let key = format!("{serial}:{target}");
+    let next = {
+        let mut map = rot_state().lock().unwrap();
+        let cur = map.entry(key).or_insert(0);
+        *cur = (*cur + 1) % 4;
+        *cur
+    };
+    let next_s = next.to_string();
+
+    if target == 0 {
+        run(adb, serial, &["shell", "settings", "put", "system", "accelerometer_rotation", "0"])?;
+        run(adb, serial, &["shell", "settings", "put", "system", "user_rotation", &next_s])
+    } else {
+        // Android 12+: rotate a specific display.
+        let did = target.to_string();
+        run(adb, serial, &["shell", "cmd", "window", "set-user-rotation", "lock", "-d", &did, &next_s])
+    }
 }
 
 /// Perform a device action. Keycode-backed actions plus a few system commands.
