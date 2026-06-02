@@ -25,6 +25,22 @@ function loadIconCache(): Record<string, string> {
 function saveIconCache(c: Record<string, string>) {
   localStorage.setItem("icon.cache", JSON.stringify(c));
 }
+
+// Per-device app-list cache (keyed by serial + include-system), so reopening is instant.
+function appsKey(serial: string, sys: boolean) {
+  return `apps.cache.${serial}.${sys ? 1 : 0}`;
+}
+function loadAppsCache(serial: string, sys: boolean): DeviceApp[] | undefined {
+  try {
+    const s = localStorage.getItem(appsKey(serial, sys));
+    return s ? (JSON.parse(s) as DeviceApp[]) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+function saveAppsCache(serial: string, sys: boolean, apps: DeviceApp[]) {
+  localStorage.setItem(appsKey(serial, sys), JSON.stringify(apps));
+}
 import { Button, PanelTitle, Toggle } from "./ui";
 
 export function AppsPanel() {
@@ -43,13 +59,13 @@ export function AppsPanel() {
   const [icons, setIcons] = useState<Record<string, string>>(() => loadIconCache());
   const [broken, setBroken] = useState<Set<string>>(new Set());
 
-  // Auto-load the app list when the panel opens (if enabled and a device is selected).
+  // Auto-load when enabled: shows the cached list instantly, then refreshes in the background.
   useEffect(() => {
-    if (autoLoad && selected && apps.length === 0 && !busy) {
+    if (autoLoad && selected) {
       load();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoLoad, selected]);
+  }, [autoLoad, selected, includeSystem]);
 
   function toggleAutoLoad(v: boolean) {
     setAutoLoad(v);
@@ -108,10 +124,16 @@ export function AppsPanel() {
   }, [pullIcon, apps]);
 
   async function load() {
+    if (!selected) return;
+    // Show the cached list for this device immediately, then refresh in the background.
+    const cached = loadAppsCache(selected, includeSystem);
+    setApps(cached ?? []); // avoid showing the previous device's list
     setBusy(true);
     setError(undefined);
     try {
-      setApps(await listApps(selected, includeSystem));
+      const fresh = await listApps(selected, includeSystem);
+      setApps(fresh);
+      saveAppsCache(selected, includeSystem, fresh);
     } catch (e) {
       setError(errMessage(e));
     } finally {
