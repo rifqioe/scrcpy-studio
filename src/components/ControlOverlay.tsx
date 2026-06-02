@@ -97,9 +97,11 @@ export function ControlOverlay() {
     })();
   }, []);
 
-  // Dock to the scrcpy window: poll its rect and stick this bar to its left edge.
+  // Poll the scrcpy window: dock to it when attached, and close this bar when the mirror is
+  // gone (after it has been seen at least once).
+  const seenRef = useRef(false);
+  const missRef = useRef(0);
   useEffect(() => {
-    if (!attached) return;
     let cancelled = false;
     let timer: number | undefined;
     async function tick() {
@@ -107,15 +109,25 @@ export function ControlOverlay() {
       try {
         const r = await scrcpyWindowRect(scrcpyTitle || undefined);
         if (r) {
-          const size = await getCurrentWindow().outerSize();
-          let x = r.x - size.width;
-          if (x < 0) x = r.x + r.w; // not enough room on the left → dock right
-          await getCurrentWindow().setPosition(new PhysicalPosition(x, r.y));
+          seenRef.current = true;
+          missRef.current = 0;
+          if (attached) {
+            const size = await getCurrentWindow().outerSize();
+            let x = r.x - size.width;
+            if (x < 0) x = r.x + r.w; // no room on the left → dock right
+            await getCurrentWindow().setPosition(new PhysicalPosition(x, r.y));
+          }
+        } else if (seenRef.current) {
+          missRef.current += 1;
+          if (missRef.current >= 4) {
+            await getCurrentWindow().close();
+            return;
+          }
         }
       } catch {
-        /* scrcpy window not found yet */
+        /* not found this tick */
       }
-      timer = window.setTimeout(tick, 300);
+      timer = window.setTimeout(tick, 400);
     }
     tick();
     return () => {
