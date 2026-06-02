@@ -54,6 +54,7 @@ export function AppsPanel() {
   const [error, setError] = useState<string>();
   const [working, setWorking] = useState<string>();
   const [menuFor, setMenuFor] = useState<string>();
+  const [menuPos, setMenuPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [autoLoad, setAutoLoad] = useState(() => localStorage.getItem("apps.autoLoad") === "1");
   const [pullIcon, setPullIcon] = useState(() => localStorage.getItem("apps.pullIcon") === "1");
   const [icons, setIcons] = useState<Record<string, string>>(() => loadIconCache());
@@ -284,44 +285,48 @@ export function AppsPanel() {
               <span className="block truncate font-mono text-[11px] text-zinc-500">{a.package}</span>
             </button>
             {a.system && <span className="shrink-0 text-[10px] text-zinc-600">system</span>}
-            <div className="relative shrink-0">
-              <button
-                onClick={() => setMenuFor(menuFor === a.package ? undefined : a.package)}
-                className="flex h-7 w-7 items-center justify-center rounded-md text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
-                title="More"
-                disabled={working === a.package}
-              >
-                {working === a.package ? "…" : <MoreVertical size={16} />}
-              </button>
-              {menuFor === a.package && (
-                <>
-                  <div className="fixed inset-0 z-30" onClick={() => setMenuFor(undefined)} />
-                  <div className="absolute right-0 top-full z-40 mt-1 min-w-[12rem] rounded-md border border-zinc-700 bg-zinc-900 py-1 shadow-xl">
-                    <button
-                      onClick={() => { setMenuFor(undefined); launchApp(a); }}
-                      className="block w-full px-3 py-1.5 text-left text-sm text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100"
-                    >
-                      Launch
-                    </button>
-                    <button
-                      onClick={() => { setMenuFor(undefined); makeShortcut(a); }}
-                      className="block w-full px-3 py-1.5 text-left text-sm text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100"
-                    >
-                      Create Desktop Shortcut
-                    </button>
-                    <button
-                      onClick={() => { setMenuFor(undefined); downloadApk(a); }}
-                      className="block w-full px-3 py-1.5 text-left text-sm text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100"
-                    >
-                      Download APK
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
+            <button
+              onClick={(e) => {
+                const r = e.currentTarget.getBoundingClientRect();
+                setMenuPos({ x: r.right, y: r.bottom });
+                setMenuFor(menuFor === a.package ? undefined : a.package);
+              }}
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
+              title="More"
+              disabled={working === a.package}
+            >
+              {working === a.package ? "…" : <MoreVertical size={16} />}
+            </button>
           </div>
         ))}
       </div>
+
+      {menuFor &&
+        (() => {
+          const app = apps.find((a) => a.package === menuFor);
+          if (!app) return null;
+          const item =
+            "block w-full px-3 py-1.5 text-left text-sm text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100";
+          return (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setMenuFor(undefined)} />
+              <div
+                className="fixed z-50 min-w-[12rem] -translate-x-full rounded-md border border-zinc-700 bg-zinc-900 py-1 shadow-xl"
+                style={{ top: menuPos.y, left: menuPos.x }}
+              >
+                <button className={item} onClick={() => { setMenuFor(undefined); launchApp(app); }}>
+                  Launch
+                </button>
+                <button className={item} onClick={() => { setMenuFor(undefined); makeShortcut(app); }}>
+                  Create Desktop Shortcut
+                </button>
+                <button className={item} onClick={() => { setMenuFor(undefined); downloadApk(app); }}>
+                  Download APK
+                </button>
+              </div>
+            </>
+          );
+        })()}
     </div>
   );
 }
