@@ -7,15 +7,16 @@ export function controlLabel(serial: string): string {
   return "control-" + (serial || "default").replace(/[^a-zA-Z0-9]/g, "_");
 }
 
-export async function openControlWindow(serial: string): Promise<void> {
+export async function openControlWindow(serial: string, title?: string): Promise<void> {
   const label = controlLabel(serial);
   const existing = await WebviewWindow.getByLabel(label);
   if (existing) {
     await existing.setFocus();
     return;
   }
+  const q = `serial=${encodeURIComponent(serial)}` + (title ? `&title=${encodeURIComponent(title)}` : "");
   const win = new WebviewWindow(label, {
-    url: `index.html?serial=${encodeURIComponent(serial)}`,
+    url: `index.html?${q}`,
     title: "Controls",
     width: 44,
     height: 600,

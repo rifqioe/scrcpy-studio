@@ -41,6 +41,7 @@ function loadAppsCache(serial: string, sys: boolean): DeviceApp[] | undefined {
 function saveAppsCache(serial: string, sys: boolean, apps: DeviceApp[]) {
   localStorage.setItem(appsKey(serial, sys), JSON.stringify(apps));
 }
+import { openControlWindow } from "../lib/controlWindow";
 import { Button, PanelTitle, Toggle } from "./ui";
 
 export function AppsPanel() {
@@ -150,6 +151,27 @@ export function AppsPanel() {
       const info = await launch(a);
       addSession(info);
       patch("virtualDisplay", { startApp: app.package });
+    } catch (e) {
+      setError(errMessage(e));
+    } finally {
+      setWorking(undefined);
+    }
+  }
+
+  async function launchWithControls(app: DeviceApp) {
+    setWorking(app.package);
+    setError(undefined);
+    try {
+      const title = `scrcpy-studio:${selected ?? ""}`;
+      const a = {
+        ...args,
+        window: { ...args.window, title },
+        virtualDisplay: { ...args.virtualDisplay, startApp: app.package },
+      };
+      const info = await launch(a);
+      addSession(info);
+      patch("virtualDisplay", { startApp: app.package });
+      await openControlWindow(selected ?? "", title);
     } catch (e) {
       setError(errMessage(e));
     } finally {
@@ -316,6 +338,9 @@ export function AppsPanel() {
               >
                 <button className={item} onClick={() => { setMenuFor(undefined); launchApp(app); }}>
                   Launch
+                </button>
+                <button className={item} onClick={() => { setMenuFor(undefined); launchWithControls(app); }}>
+                  Launch with Controls
                 </button>
                 <button className={item} onClick={() => { setMenuFor(undefined); makeShortcut(app); }}>
                   Create Desktop Shortcut
