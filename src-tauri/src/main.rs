@@ -5,7 +5,7 @@ fn main() {
     let args: Vec<String> = std::env::args().collect();
     if let Some(pos) = args.iter().position(|a| a == "--launch") {
         // Desktop-shortcut entry: spawn scrcpy silently with the remaining args, then exit.
-        scrcpy_studio_lib::headless_launch(&args[pos + 1..]);
+        scrcpy_studio_lib::run_launch(args[pos + 1..].to_vec());
         return;
     }
     scrcpy_studio_lib::run()
