@@ -266,7 +266,7 @@ export function ControlOverlay() {
           {collapsed ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
         </button>
         <div data-tauri-drag-region title="Drag" className="flex h-6 w-full cursor-move items-center justify-center text-zinc-600">
-          <GripHorizontal size={15} />
+          <GripHorizontal size={15} className="pointer-events-none" />
         </div>
       </div>
     </div>
