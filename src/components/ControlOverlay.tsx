@@ -25,7 +25,7 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
-import { deviceAction, deviceScreenshot, listDevices, scrcpyWindowRect } from "../lib/ipc";
+import { deviceAction, deviceScreenshot, listDevices, scrcpyWindowRect, fitWindow } from "../lib/ipc";
 import type { Device } from "../lib/types";
 
 interface Btn {
@@ -83,6 +83,19 @@ export function ControlOverlay() {
       })
       .catch(() => undefined);
   }, [initial]);
+
+  // Force a thin width via Win32 (WebView2 otherwise clamps the window much wider).
+  useEffect(() => {
+    (async () => {
+      try {
+        const dpr = window.devicePixelRatio || 1;
+        const size = await getCurrentWindow().outerSize();
+        await fitWindow(Math.round(36 * dpr), size.height);
+      } catch {
+        /* ignore */
+      }
+    })();
+  }, []);
 
   // Dock to the scrcpy window: poll its rect and stick this bar to its left edge.
   useEffect(() => {

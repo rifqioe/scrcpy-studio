@@ -80,6 +80,9 @@ export interface WinRect {
 export const scrcpyWindowRect = (title?: string) =>
   invoke<WinRect | null>("scrcpy_window_rect", { title });
 
+export const fitWindow = (width: number, height: number) =>
+  invoke<void>("fit_window", { width, height });
+
 // ---- profiles ----
 export const profileSave = (name: string, args: ScrcpyArgs) =>
   invoke<void>("profile_save", { name, args });

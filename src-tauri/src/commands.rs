@@ -381,6 +381,39 @@ pub fn scrcpy_window_rect(title: Option<String>) -> Option<WinRect> {
     }
 }
 
+/// Force the calling window to an exact physical size via Win32, bypassing the WebView2
+/// minimum-width clamp so the control bar can be truly thin.
+#[tauri::command]
+pub fn fit_window(window: tauri::WebviewWindow, width: i32, height: i32) -> Result<()> {
+    #[cfg(windows)]
+    {
+        use windows::Win32::Foundation::HWND;
+        use windows::Win32::UI::WindowsAndMessaging::{
+            SetWindowPos, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOZORDER,
+        };
+        let raw = window.hwnd().map_err(|e| AppError::Io(e.to_string()))?;
+        // Rebuild HWND in this crate's `windows` version (tauri may use a different one).
+        let hwnd = HWND(raw.0 as *mut core::ffi::c_void);
+        unsafe {
+            SetWindowPos(
+                hwnd,
+                HWND::default(),
+                0,
+                0,
+                width,
+                height,
+                SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE,
+            )
+            .map_err(|e| AppError::Io(e.to_string()))?;
+        }
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = (window, width, height);
+    }
+    Ok(())
+}
+
 // ---- device control (floating toolbar) ----
 
 #[tauri::command]

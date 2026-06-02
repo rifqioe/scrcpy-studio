@@ -99,6 +99,7 @@ pub fn run_launch(scrcpy_argv: Vec<String>) {
             commands::device_action,
             commands::device_screenshot,
             commands::scrcpy_window_rect,
+            commands::fit_window,
         ])
         .run(tauri::generate_context!())
         .expect("error while running launch instance");
@@ -141,6 +142,7 @@ pub fn run() {
             commands::device_action,
             commands::device_screenshot,
             commands::scrcpy_window_rect,
+            commands::fit_window,
             commands::preview_argv,
             commands::launch,
             commands::stop_session,
