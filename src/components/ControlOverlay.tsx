@@ -90,7 +90,7 @@ export function ControlOverlay() {
       try {
         const dpr = window.devicePixelRatio || 1;
         const size = await getCurrentWindow().outerSize();
-        await fitWindow(Math.round(36 * dpr), size.height);
+        await fitWindow(Math.round(48 * dpr), size.height);
       } catch {
         /* ignore */
       }
