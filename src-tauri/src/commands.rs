@@ -393,7 +393,7 @@ pub fn rotate_scrcpy(title: Option<String>) -> Result<()> {
     {
         use windows::Win32::UI::Input::KeyboardAndMouse::{
             SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYBD_EVENT_FLAGS,
-            KEYEVENTF_KEYUP, VIRTUAL_KEY, VK_MENU,
+            KEYEVENTF_KEYUP, VIRTUAL_KEY, VK_LMENU,
         };
         use windows::Win32::UI::WindowsAndMessaging::SetForegroundWindow;
 
@@ -413,15 +413,17 @@ pub fn rotate_scrcpy(title: Option<String>) -> Result<()> {
                 },
             },
         };
-        // MOD+r — default scrcpy modifier is (left) Alt.
+        // MOD+r — default scrcpy modifier is left Alt.
         let inputs = [
-            mk(VK_MENU, false),
+            mk(VK_LMENU, false),
             mk(key_r, false),
             mk(key_r, true),
-            mk(VK_MENU, true),
+            mk(VK_LMENU, true),
         ];
         unsafe {
             let _ = SetForegroundWindow(hwnd);
+            // Give the window a moment to take focus before injecting the keys.
+            std::thread::sleep(std::time::Duration::from_millis(80));
             SendInput(&inputs, std::mem::size_of::<INPUT>() as i32);
         }
     }
