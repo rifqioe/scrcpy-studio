@@ -3,6 +3,7 @@
 // window URL and can switch among connected devices itself.
 import { useEffect, useRef, useState } from "react";
 import { getCurrentWindow, PhysicalPosition } from "@tauri-apps/api/window";
+import { openPath } from "@tauri-apps/plugin-opener";
 import {
   Bell,
   Camera,
@@ -24,7 +25,7 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
-import { deviceAction, deviceScreenshot, listDevices, scrcpyWindowRect, errMessage } from "../lib/ipc";
+import { deviceAction, deviceScreenshot, listDevices, scrcpyWindowRect } from "../lib/ipc";
 import type { Device } from "../lib/types";
 
 interface Btn {
@@ -67,7 +68,6 @@ export function ControlOverlay() {
   const scrcpyTitle = params.get("title") ?? "";
   const [devices, setDevices] = useState<Device[]>([]);
   const [target, setTarget] = useState(initial);
-  const [status, setStatus] = useState<string>();
   const [attached, setAttached] = useState(true);
   const holdTimer = useRef<number | null>(null);
   const repeatTimer = useRef<number | null>(null);
@@ -113,25 +113,22 @@ export function ControlOverlay() {
 
   async function send(action: string) {
     const serial = targetRef.current;
-    if (!serial) {
-      setStatus("no device");
-      return;
-    }
+    if (!serial) return;
     try {
       await deviceAction(serial, action);
-    } catch (e) {
-      setStatus(errMessage(e));
+    } catch {
+      /* ignore */
     }
   }
 
   async function shot() {
     if (!targetRef.current) return;
-    setStatus("…");
     try {
       const path = await deviceScreenshot(targetRef.current, Date.now());
-      setStatus(path.split(/[\\/]/).pop());
-    } catch (e) {
-      setStatus(errMessage(e));
+      // Open the screenshot in the default image viewer.
+      await openPath(path);
+    } catch {
+      /* ignore */
     }
   }
 
@@ -221,12 +218,7 @@ export function ControlOverlay() {
         );
       })}
 
-      <div className="mt-auto flex w-full flex-col items-center">
-        {status && (
-          <span className="max-w-full truncate px-1 text-[8px] text-zinc-500" title={status}>
-            {status}
-          </span>
-        )}
+      <div className="mt-auto w-full">
         <div data-tauri-drag-region title="Drag" className="flex h-6 w-full cursor-move items-center justify-center text-zinc-600">
           <GripHorizontal size={15} />
         </div>
